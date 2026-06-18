@@ -1,0 +1,4 @@
+requests>=2.28
+flask>=3.0
+# macOS system Python 3.9 is built against LibreSSL; urllib3 2.x requires OpenSSL 1.1.1+
+urllib3<2

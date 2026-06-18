@@ -1,0 +1,1327 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Contact → Portal Documents Report</title>
+<style>
+  :root {
+    --ink:#15212b; --ink-soft:#5a6b78; --line:#dfe5ea; --bg:#f5f7f9; --panel:#ffffff;
+    --accent:#1f6feb; --ok:#127a3e; --ok-bg:#e7f4ec; --bad:#b42318; --bad-bg:#fdeceb;
+    --warn:#9a6700; --warn-bg:#fdf3e2; --absent:#9aa7b1;
+    --mono:"SF Mono",ui-monospace,"Cascadia Code",Menlo,Consolas,monospace;
+    --sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    --radius:10px;
+  }
+  *, *::before, *::after { box-sizing: border-box }
+  body { margin:0; background:var(--bg); color:var(--ink); font-family:var(--sans); font-size:14px; line-height:1.5 }
+  .wrap { max-width:1200px; margin:0 auto; padding:28px 22px 80px }
+
+  /* ── header ── */
+  header h1 { font-size:20px; margin:0 0 2px; letter-spacing:-.01em }
+  header p  { margin:0 0 20px; color:var(--ink-soft) }
+
+  /* ── panel ── */
+  .panel { background:var(--panel); border:1px solid var(--line); border-radius:var(--radius); padding:18px }
+  .section-title { font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.06em; color:var(--ink-soft); margin:18px 0 8px }
+  .grid { display:grid; grid-template-columns:1fr 1fr 1fr; gap:14px 18px }
+
+  /* ── form controls ── */
+  label { display:block; font-weight:600; font-size:12px; margin:0 0 5px; color:var(--ink) }
+  label .hint { font-weight:400; color:var(--ink-soft) }
+  input[type=text], textarea, select {
+    width:100%; padding:9px 10px; border:1px solid var(--line); border-radius:7px;
+    font-family:var(--mono); font-size:12px; background:#fff; color:var(--ink);
+  }
+  input[type=text]:focus, textarea:focus, select:focus {
+    outline:2px solid var(--accent); outline-offset:-1px; border-color:var(--accent)
+  }
+  textarea { min-height:52px; resize:vertical }
+  select { font-family:var(--sans) }
+
+  /* ── buttons ── */
+  button { font-family:var(--sans); font-size:14px; font-weight:600; border:0; border-radius:7px; padding:10px 18px; cursor:pointer; transition:opacity .15s }
+  .btn-go    { background:var(--accent); color:#fff }
+  .btn-go:hover:not(:disabled) { background:#1558c0 }
+  .btn-ghost { background:#fff; border:1px solid var(--line); color:var(--ink); font-weight:500 }
+  .btn-ghost:hover:not(:disabled) { background:var(--bg) }
+  button:disabled { opacity:.45; cursor:not-allowed }
+  .row { display:flex; gap:10px; align-items:center; margin-top:16px; flex-wrap:wrap }
+  .muted { color:var(--ink-soft); font-size:12px }
+
+  /* ── progress ── */
+  .status { margin:14px 0 0; color:var(--ink-soft); font-size:13px; min-height:18px }
+  .status.err { color:var(--bad) }
+  .progress-wrap { margin:10px 0 0; height:6px; background:var(--line); border-radius:3px; overflow:hidden; display:none }
+  .progress-bar  { height:100%; background:var(--accent); border-radius:3px; width:0%; transition:width .2s }
+
+  /* ── summary chips ── */
+  .summary { display:flex; gap:10px; flex-wrap:wrap; margin:18px 0 10px }
+  .chip { background:#fff; border:1px solid var(--line); border-radius:8px; padding:9px 14px; min-width:90px; position:relative; cursor:help }
+  .chip .lbl { font-size:11px; color:var(--ink-soft); border-bottom:1px dotted var(--line) }
+  /* hover tooltip */
+  .chip[data-tip]:hover::after {
+    content: attr(data-tip);
+    position:absolute; left:0; top:calc(100% + 8px);
+    background:var(--ink); color:#fff; padding:8px 11px; border-radius:6px;
+    font-size:11px; line-height:1.45; font-weight:400; letter-spacing:0;
+    width:max-content; max-width:250px; z-index:20;
+    box-shadow:0 6px 18px rgba(21,33,43,.22); white-space:normal;
+  }
+  .chip[data-tip]:hover::before {
+    content:""; position:absolute; left:16px; top:calc(100% + 2px);
+    border:6px solid transparent; border-bottom-color:var(--ink); z-index:20;
+  }
+
+  /* ── warning banner ── */
+  .warn-banner { background:var(--warn-bg); border:1px solid #f0d9a8; color:var(--warn);
+    border-radius:8px; padding:10px 14px; margin:0 0 12px; font-size:12px; line-height:1.6 }
+  .chip b { display:block; font-size:22px; line-height:1.1 }
+  .chip span { font-size:11px; color:var(--ink-soft) }
+
+  /* ── target-type breakdown row ── */
+  .summary-targets { margin:0 0 10px; align-items:center }
+  .group-label { font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.05em;
+    color:var(--ink-soft); align-self:center; margin-right:2px }
+  .chip-sm { background:#fbfcfd; border:1px solid var(--line); border-radius:8px;
+    padding:7px 12px; min-width:74px; position:relative; cursor:help }
+  .chip-sm b { display:block; font-size:17px; line-height:1.1; color:var(--ink) }
+  .chip-sm span { font-size:10px; color:var(--ink-soft) }
+  .chip-sm[data-tip]:hover::after {
+    content: attr(data-tip);
+    position:absolute; left:0; top:calc(100% + 8px);
+    background:var(--ink); color:#fff; padding:8px 11px; border-radius:6px;
+    font-size:11px; line-height:1.45; font-weight:400;
+    width:max-content; max-width:260px; z-index:20;
+    box-shadow:0 6px 18px rgba(21,33,43,.22); white-space:normal;
+  }
+  .chip-sm[data-tip]:hover::before {
+    content:""; position:absolute; left:16px; top:calc(100% + 2px);
+    border:6px solid transparent; border-bottom-color:var(--ink); z-index:20;
+  }
+
+  /* ── search / filter bar ── */
+  .toolbar { display:flex; gap:12px; align-items:center; margin:0 0 10px; flex-wrap:wrap }
+  .toolbar input[type=text] { width:220px; font-size:12px; padding:7px 10px }
+  .toolbar select { width:auto; font-family:var(--sans); font-size:12px; padding:7px 10px }
+
+  /* ── contact cards ── */
+  .cards { display:flex; flex-direction:column; gap:10px }
+  .card { background:#fff; border:1px solid var(--line); border-radius:var(--radius); overflow:hidden }
+  .card-head {
+    display:flex; align-items:center; gap:12px; padding:12px 16px;
+    cursor:pointer; user-select:none;
+  }
+  .card-head:hover { background:#f7f9fb }
+  .card-avatar {
+    width:34px; height:34px; border-radius:50%; background:var(--accent);
+    color:#fff; font-weight:700; font-size:13px; display:flex; align-items:center; justify-content:center;
+    flex-shrink:0;
+  }
+  .card-name  { font-weight:600; font-size:14px }
+  .card-email { font-size:12px; color:var(--ink-soft) }
+  .card-meta  { margin-left:auto; display:flex; align-items:center; gap:10px }
+  .badge { display:inline-flex; align-items:center; justify-content:center;
+    background:var(--accent); color:#fff; border-radius:20px;
+    font-size:11px; font-weight:700; padding:2px 9px; min-width:26px }
+  .badge.zero { background:var(--line); color:var(--ink-soft) }
+  .chevron { color:var(--ink-soft); font-size:11px; transition:transform .2s }
+  .chevron.open { transform:rotate(180deg) }
+
+  .card-body { display:none; border-top:1px solid var(--line); padding:0 }
+  .card-body.open { display:block }
+
+  /* ── file table inside card ── */
+  .file-table { width:100%; border-collapse:collapse; font-size:12px }
+  .file-table th { background:#fafbfc; font-size:10px; text-transform:uppercase; letter-spacing:.04em;
+    color:var(--ink-soft); padding:7px 14px; text-align:left; border-bottom:1px solid var(--line) }
+  .file-table td { padding:8px 14px; border-bottom:1px solid var(--line); vertical-align:middle }
+  .file-table tr:last-child td { border-bottom:0 }
+  .file-table tr:hover td { background:#fafbfc }
+  .file-name { font-weight:500 }
+  .file-id   { font-family:var(--mono); font-size:10px; color:var(--ink-soft) }
+  .file-date { font-family:var(--mono); font-size:11px; white-space:nowrap }
+  .no-files  { padding:16px 14px; color:var(--ink-soft); font-size:12px; font-style:italic }
+
+  /* ── shared-with target type tags ── */
+  .tt { display:inline-block; font-size:11px; font-weight:600; padding:2px 9px; border-radius:20px; white-space:nowrap }
+  .tt-all       { background:#e7f0ff; color:#1558c0 }
+  .tt-contacts  { background:var(--ok-bg); color:var(--ok) }
+  .tt-ie        { background:#fff3e0; color:#9a5b00 }
+  .tt-iefle     { background:#f3e8ff; color:#7322b8 }
+  .tt-inv       { background:#e9f6f1; color:#0f7a52 }
+  .tt-other     { background:var(--line); color:var(--ink-soft) }
+
+  /* ── related fund tags ── */
+  .fund-tag { display:inline-block; font-family:var(--mono); font-size:10px; color:var(--ink);
+    background:#f0f3f5; border:1px solid var(--line); border-radius:5px; padding:1px 6px; margin:1px 2px 1px 0; white-space:nowrap }
+
+  /* ── copy button ── */
+  .copy-btn { background:none; border:1px solid var(--line); border-radius:4px;
+    padding:1px 6px; font-size:10px; font-weight:500; color:var(--ink-soft);
+    cursor:pointer; margin-left:6px; vertical-align:middle }
+  .copy-btn:hover { background:var(--bg) }
+  .copy-btn.copied { color:var(--ok); border-color:var(--ok) }
+
+  /* ── JSON viewer ── */
+  .json-section { margin-top:24px }
+  .json-section h2 { font-size:14px; font-weight:700; margin:0 0 8px }
+  .json-wrap {
+    background:#1e2a35; color:#c9d1d9; border-radius:var(--radius);
+    padding:16px; font-family:var(--mono); font-size:11px; line-height:1.6;
+    overflow:auto; max-height:400px; white-space:pre;
+  }
+  .json-wrap .j-key   { color:#79c0ff }
+  .json-wrap .j-str   { color:#a5d6ff }
+  .json-wrap .j-num   { color:#f2cc60 }
+  .json-wrap .j-bool  { color:#ff7b72 }
+  .json-wrap .j-null  { color:#8b949e }
+
+  /* ── CORS hint ── */
+  details { margin-top:10px; font-size:12px; color:var(--ink-soft) }
+  summary { cursor:pointer; user-select:none }
+
+  @media(max-width:640px) { .grid { grid-template-columns:1fr } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>Contact → Portal Documents Report</h1>
+    <p>Fetches all contacts for a firm, then maps each contact to the portal documents they can access.</p>
+  </header>
+
+  <!-- ── inputs ── -->
+  <div class="panel">
+    <div class="grid">
+      <div>
+        <label>Server <span class="hint">(base URL)</span></label>
+        <input type="text" id="server" value="https://api-minas-tirith.anduin.dev" spellcheck="false">
+      </div>
+      <div>
+        <label>Firm ID <span class="hint">(required)</span></label>
+        <input type="text" id="firmId" value="fdfym4md5jlverjn" spellcheck="false">
+      </div>
+      <div>
+        <label>API Key <span class="hint">(Bearer token)</span></label>
+        <textarea id="apiKey" placeholder="paste API key — no 'Bearer ' prefix needed" spellcheck="false"></textarea>
+      </div>
+    </div>
+
+    <div style="margin-top:16px">
+      <label>Query mode</label>
+      <select id="mode" style="max-width:480px">
+        <option value="bulk">Bulk — fetch all documents once, then map locally (light on server)</option>
+        <option value="exact">Per-contact — one query per contact (exact, heavier)</option>
+      </select>
+      <p class="muted" id="modeHint" style="margin:6px 0 0"></p>
+    </div>
+
+    <div style="margin-top:14px" id="invMatrixWrap">
+      <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-weight:500">
+        <input type="checkbox" id="useInvMatrix" style="width:auto">
+        Use Investment matrix
+      </label>
+      <p class="muted" style="margin:6px 0 0">
+        Runs the investment communication-matrix export to resolve documents shared by <b>Investments</b>.
+        Only available on firms that have the investment matrix enabled. Leave off if unsure — any
+        investment-shared documents will simply be flagged in the report.
+      </p>
+
+      <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-weight:500;margin-top:12px">
+        <input type="checkbox" id="useInvViaIEFLE" style="width:auto">
+        Resolve Investments via IE × FLE matrix
+      </label>
+      <p class="muted" style="margin:6px 0 0">
+        Special case for firms <b>without</b> an investment matrix: each investment is mapped to its investment
+        entity and fund legal entity (via the investments export), then contacts are found through the
+        <b>IE × FLE × communication-type</b> matrix instead. When on, this takes priority over the investment
+        matrix for <b>Investments</b>-shared documents.
+      </p>
+    </div>
+
+    <div class="row">
+      <button class="btn-go" id="run">Generate report</button>
+      <button class="btn-ghost" id="btnDownloadJson" disabled>Download JSON</button>
+      <span class="muted">Credentials stay in this page — only sent to the server above.</span>
+    </div>
+
+    <div class="status" id="status"></div>
+    <div class="progress-wrap" id="progressWrap">
+      <div class="progress-bar" id="progressBar"></div>
+    </div>
+
+    <details>
+      <summary>CORS / local server note</summary>
+      <div style="margin-top:6px;line-height:1.8">
+        If opening this file directly from disk (<code>file://</code>), browsers block cross-origin requests.<br>
+        Fix: run <code>python3 -m http.server 8000</code> in the same folder and open
+        <code>http://localhost:8000/anduin-portal-documents.html</code>
+      </div>
+    </details>
+  </div>
+
+  <!-- ── results ── -->
+  <div id="results" hidden>
+    <div class="warn-banner" id="warnBanner" style="display:none"></div>
+    <div class="summary" id="summary"></div>
+    <div class="summary summary-targets" id="summaryTargets"></div>
+    <div class="summary summary-targets" id="summaryMatrices"></div>
+
+    <div class="toolbar">
+      <input type="text" id="search" placeholder="Search contacts or files…">
+      <select id="filterDocs">
+        <option value="all">All contacts</option>
+        <option value="with">Has documents</option>
+        <option value="without">No documents</option>
+      </select>
+    </div>
+
+    <div class="cards" id="cards"></div>
+
+    <!-- JSON report preview -->
+    <div class="json-section" id="jsonSection">
+      <div style="display:flex;align-items:center;gap:12px;margin-bottom:8px">
+        <h2 style="margin:0">JSON Report</h2>
+        <button class="btn-ghost" style="font-size:12px;padding:5px 12px" id="btnCopyJson">Copy JSON</button>
+      </div>
+      <div class="json-wrap" id="jsonWrap"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ════════════════════════════════════════════════
+   Helpers
+════════════════════════════════════════════════ */
+const $ = id => document.getElementById(id);
+const esc = s => String(s||"").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const delay = ms => new Promise(r => setTimeout(r, ms));
+
+/** Copy text to the clipboard. Falls back to execCommand when the async
+ *  Clipboard API is unavailable (e.g. non-secure http:// or file:// contexts). */
+async function copyText(text) {
+  try {
+    if (navigator.clipboard && window.isSecureContext) {
+      await navigator.clipboard.writeText(text);
+      return true;
+    }
+  } catch { /* fall through to legacy path */ }
+  try {
+    const ta = document.createElement("textarea");
+    ta.value = text;
+    ta.setAttribute("readonly", "");
+    ta.style.position = "fixed";
+    ta.style.top = "-1000px";
+    ta.style.opacity = "0";
+    document.body.appendChild(ta);
+    ta.focus(); ta.select();
+    const ok = document.execCommand("copy");
+    document.body.removeChild(ta);
+    return ok;
+  } catch { return false; }
+}
+
+/** Click handler for the small "copy" buttons; reads the value from data-copy. */
+async function copyFromBtn(btn) {
+  const text = btn.getAttribute("data-copy") || "";
+  const ok = await copyText(text);
+  const original = btn.textContent;
+  btn.textContent = ok ? "copied!" : "failed";
+  btn.classList.toggle("copied", ok);
+  setTimeout(() => { btn.textContent = original; btn.classList.remove("copied"); }, 1200);
+}
+
+function setStatus(msg, err = false) {
+  const s = $("status");
+  s.textContent = msg;
+  s.className = "status" + (err ? " err" : "");
+}
+
+function setProgress(n, total) {
+  const pct = total > 0 ? Math.round(n / total * 100) : 0;
+  $("progressBar").style.width = pct + "%";
+}
+
+function showProgress(show) {
+  $("progressWrap").style.display = show ? "block" : "none";
+}
+
+function fmtDate(iso) {
+  if (!iso) return "—";
+  try {
+    const d = new Date(iso);
+    return d.toLocaleDateString(undefined, { year:"numeric", month:"short", day:"numeric" });
+  } catch { return iso; }
+}
+
+function initials(first, last) {
+  return ((first||"")[0]||"") + ((last||"")[0]||"");
+}
+
+/** Render a document's sharing target type as a small colored tag. */
+const TARGET_LABELS = {
+  AllContacts:                          { text: "All contacts",   cls: "tt-all" },
+  Contacts:                             { text: "Contacts",       cls: "tt-contacts" },
+  InvestmentEntities:                   { text: "Entities",       cls: "tt-ie" },
+  InvestmentEntitiesInFundLegalEntity:  { text: "Entity × fund",  cls: "tt-iefle" },
+  Investments:                          { text: "Investments",    cls: "tt-inv" },
+};
+function targetTypeLabel(t) {
+  if (!t) return '<span style="color:var(--absent)">—</span>';
+  const m = TARGET_LABELS[t] || { text: t, cls: "tt-other" };
+  return `<span class="tt ${m.cls}" title="${esc(t)}">${esc(m.text)}</span>`;
+}
+
+/**
+ * Extract the related fund legal entities from a document's sharing target.
+ * Fund IDs come from the get-portal-documents response; names come from the
+ * fund-legal-entities lookup (fleNames: Map(id → name)).
+ *   - Contacts.fundLegalEntityIds                       → listed FLEs
+ *   - InvestmentEntitiesInFundLegalEntity[].fundLegalEntityId
+ *   - Investments.investmentIds (fdf….fle….fii…)        → FLE prefix of each investment
+ */
+function relatedFundsFromShare(sw, fleNames) {
+  const ids = new Set();
+  if (sw) {
+    const t = sw.targetType;
+    if (t === "Contacts") {
+      (sw.fundLegalEntityIds || []).forEach(f => f && ids.add(f));
+    } else if (t === "InvestmentEntitiesInFundLegalEntity") {
+      (sw.investmentEntityInFundLegalEntity || []).forEach(p => p.fundLegalEntityId && ids.add(p.fundLegalEntityId));
+    } else if (t === "Investments") {
+      (sw.investmentIds || []).forEach(invId => {
+        const fle = String(invId).split(".").slice(0, 2).join(".");   // fdf….fle…
+        if (fle.includes(".fle")) ids.add(fle);
+      });
+    }
+  }
+  return [...ids].map(id => ({ id, name: (fleNames && fleNames.get(id)) || null }));
+}
+
+/** Render related fund legal entities as compact tags (fund name, full ID in tooltip). */
+function relatedFundsLabel(funds) {
+  if (!funds || !funds.length) return '<span style="color:var(--absent)">—</span>';
+  return funds.map(f => {
+    const shortId = String(f.id).split(".").slice(1).join(".") || f.id;   // fle…
+    const text = f.name || shortId;
+    return `<span class="fund-tag" title="${esc(f.id)}${f.name ? "" : " (name not found)"}">${esc(text)}</span>`;
+  }).join(" ");
+}
+
+/* ════════════════════════════════════════════════
+   API layer
+════════════════════════════════════════════════ */
+let netCalls = 0;   // counts every request made to the server (for the load report)
+
+function headers(apiKey) {
+  return {
+    "authorization": "Bearer " + apiKey.trim(),
+    "content-type":  "application/json",
+  };
+}
+
+async function apiFetch(url, apiKey) {
+  netCalls++;
+  const res = await fetch(url, { method:"GET", headers: headers(apiKey) });
+  if (!res.ok) {
+    let msg = `HTTP ${res.status} from ${new URL(url).hostname}`;
+    try { const b = await res.json(); msg += ": " + (b.message || JSON.stringify(b)); } catch {}
+    throw new Error(msg);
+  }
+  return res.json();
+}
+
+/** Fetch ALL contacts (offset-based, max 100/page) */
+async function fetchAllContacts(server, firmId, apiKey) {
+  const base = `${server}/api/v1/idm/${encodeURIComponent(firmId)}/contacts`;
+  let offset = 0, total = Infinity, all = [];
+  while (offset < total) {
+    const url = `${base}?offset=${offset}&first=100`;
+    const data = await apiFetch(url, apiKey);
+    total = data.total ?? 0;
+    const page = data.data || [];
+    all = all.concat(page);
+    offset += page.length;
+    setStatus(`Loading contacts… ${all.length} / ${total}`);
+    if (page.length === 0) break;
+  }
+  return all;
+}
+
+/** Fetch ALL fund legal entities (cursor-paginated) → Map(fleId → name). */
+async function fetchFundLegalEntityNames(server, firmId, apiKey, onProgress) {
+  const base = `${server}/api/v1/idm/${encodeURIComponent(firmId)}/fund-legal-entities`;
+  const names = new Map();
+  let cursor = null, guard = 0;
+  do {
+    const params = new URLSearchParams();
+    if (cursor) params.set("cursor", cursor);
+    const data = await apiFetch(`${base}?${params}`, apiKey);
+    (data.data || []).forEach(fle => { if (fle && fle.id) names.set(fle.id, fle.name || fle.id); });
+    cursor = data.nextCursor || null;
+    guard++;
+    if (onProgress) onProgress(names.size);
+    if ((data.data || []).length === 0) break;
+  } while (cursor && guard < 50);
+  return names;
+}
+
+/** Fetch ALL portal docs for a given contact (cursor-paginated) */
+async function fetchDocsForContact(server, firmId, apiKey, contactId) {
+  const base = `${server}/api/v1/idm/${encodeURIComponent(firmId)}/portal-documents`;
+  let cursor = null, all = [];
+  do {
+    const params = new URLSearchParams({ "contact-id": contactId });
+    if (cursor) params.set("cursor", cursor);
+    const data = await apiFetch(`${base}?${params}`, apiKey);
+    all = all.concat(data.data || []);
+    cursor = data.nextCursor || null;
+    if ((data.data || []).length === 0) break;
+  } while (cursor);
+  return all;
+}
+
+/** EXACT MODE: per-contact queries, throttled to be gentle on the server */
+async function fetchAllContactDocs(server, firmId, apiKey, contacts, onProgress) {
+  const CONCURRENCY = 4;       // small parallel window
+  const BATCH_DELAY = 150;     // ms pause between batches to avoid bursts
+  const results = new Array(contacts.length);
+  let done = 0;
+  for (let i = 0; i < contacts.length; i += CONCURRENCY) {
+    const batch = contacts.slice(i, i + CONCURRENCY);
+    await Promise.all(batch.map(async (c, j) => {
+      try {
+        results[i + j] = await fetchDocsForContact(server, firmId, apiKey, c.id);
+      } catch {
+        results[i + j] = [];
+      }
+      done++;
+      onProgress(done, contacts.length);
+    }));
+    if (i + CONCURRENCY < contacts.length) await delay(BATCH_DELAY);
+  }
+  return results;
+}
+
+/** BULK MODE: fetch every portal document once (cursor-paginated, no contact filter) */
+async function fetchAllPortalDocuments(server, firmId, apiKey, onProgress) {
+  const base = `${server}/api/v1/idm/${encodeURIComponent(firmId)}/portal-documents`;
+  let cursor = null, all = [], page = 0;
+  do {
+    const params = new URLSearchParams();
+    if (cursor) params.set("cursor", cursor);
+    const data = await apiFetch(`${base}?${params}`, apiKey);
+    all = all.concat(data.data || []);
+    cursor = data.nextCursor || null;
+    page++;
+    onProgress(all.length, page);
+    if ((data.data || []).length === 0) break;
+  } while (cursor);
+  return all;
+}
+
+/* ──────────────────────────────────────────────
+   Async bulk-export workflow
+   POST …/export → { requestId } → poll GET /api/v1/request/{id}
+   → on Completed: result.fileUrl (CSV) + result.nextCursor
+────────────────────────────────────────────── */
+
+/** Poll a long-running request until it Completes or Fails. */
+async function pollLongRequest(server, apiKey, requestId, onStatus) {
+  const url = `${server}/api/v1/request/${encodeURIComponent(requestId)}`;
+  const MAX_POLLS = 120, INTERVAL = 1500;   // up to ~3 minutes
+  for (let i = 0; i < MAX_POLLS; i++) {
+    const data = await apiFetch(url, apiKey);
+    if (onStatus) onStatus(data.status, data.progress);
+    if (data.status === "Completed") return data.result || {};
+    if (data.status === "Failed") throw new Error("Export job failed: " + (data.error || "unknown error"));
+    await delay(INTERVAL);
+  }
+  throw new Error("Export job timed out after ~3 minutes.");
+}
+
+/** Download a pre-signed export file (CSV). No auth header — the URL is signed. */
+async function fetchExportFile(fileUrl) {
+  netCalls++;
+  const res = await fetch(fileUrl);
+  if (!res.ok) throw new Error(`Could not download export file (HTTP ${res.status}).`);
+  return res.text();
+}
+
+/**
+ * Run a full async export (handles cursor paging), returning the combined parsed rows.
+ * endpointPath e.g. "communication-matrices/export", "investment-communication-matrices/export",
+ * or "investments/export". `parser` turns CSV text into row objects (defaults to parseMatrixCsv).
+ */
+async function runExportJob(server, firmId, apiKey, endpointPath, onStatus, parser = parseMatrixCsv) {
+  const base = `${server}/api/v1/idm/${encodeURIComponent(firmId)}/${endpointPath}`;
+  let cursor = null, allRows = [], guard = 0;
+  do {
+    netCalls++;
+    const initRes = await fetch(base, {
+      method: "POST",
+      headers: headers(apiKey),
+      body: JSON.stringify(cursor ? { cursor } : {}),
+    });
+    if (!initRes.ok) {
+      let msg = `HTTP ${initRes.status} starting export (${endpointPath})`;
+      try { const b = await initRes.json(); msg += ": " + (b.message || JSON.stringify(b)); } catch {}
+      throw new Error(msg);
+    }
+    const { requestId } = await initRes.json();
+    const result = await pollLongRequest(server, apiKey, requestId, onStatus);
+    if (result.fileUrl) {
+      try {
+        const csv = await fetchExportFile(result.fileUrl);
+        allRows = allRows.concat(parser(csv));
+      } catch (e) {
+        // Most likely a CORS block on the storage URL — surface clearly upstream.
+        throw new Error(e.message + " (the export file host may not allow browser downloads / CORS).");
+      }
+    }
+    cursor = result.nextCursor || null;
+    guard++;
+  } while (cursor && guard < 50);
+  return allRows;
+}
+
+/* ──────────────────────────────────────────────
+   CSV parsing — the matrix exports have named headers:
+     comm matrix:        fundLegalEntityId, investmentEntityId, contactId, communicationTypes
+     investment matrix:  investmentId, contactId, communicationTypes, financialData
+   `communicationTypes` is a JSON object string mapping communicationTypeId → "yes"/"no".
+   A contact is granted a communication type only when its value is "yes".
+────────────────────────────────────────────── */
+function parseCsv(text) {
+  const rows = []; let row = [], field = "", inQuotes = false;
+  for (let i = 0; i < text.length; i++) {
+    const c = text[i];
+    if (inQuotes) {
+      if (c === '"') { if (text[i + 1] === '"') { field += '"'; i++; } else inQuotes = false; }
+      else field += c;
+    } else {
+      if (c === '"') inQuotes = true;
+      else if (c === ',') { row.push(field); field = ""; }
+      else if (c === '\n') { row.push(field); rows.push(row); row = []; field = ""; }
+      else if (c === '\r') { /* ignore */ }
+      else field += c;
+    }
+  }
+  if (field.length || row.length) { row.push(field); rows.push(row); }
+  return rows;
+}
+
+/** Parse the JSON communicationTypes map → Set of communicationTypeIds whose value is "yes". */
+function parseYesCommTypes(raw) {
+  const yes = new Set();
+  const v = String(raw || "").trim();
+  if (!v) return yes;
+  try {
+    const obj = JSON.parse(v);
+    for (const k in obj) if (String(obj[k]).toLowerCase() === "yes") yes.add(k);
+  } catch { /* leave empty on malformed cell */ }
+  return yes;
+}
+
+/**
+ * Parse a matrix CSV by header name. Returns rows of
+ * { contact, ie, fle, investment, yesTypes:Set<commTypeId> }.
+ * Unused columns are simply ignored, so either export shape works.
+ */
+function parseMatrixCsv(text) {
+  const rows = parseCsv(text);
+  if (rows.length < 2) return [];
+  const header = rows[0].map(h => String(h).trim());
+  const idx = name => header.indexOf(name);
+  const ci = {
+    contact:    idx("contactId"),
+    ie:         idx("investmentEntityId"),
+    fle:        idx("fundLegalEntityId"),
+    investment: idx("investmentId"),
+    comm:       idx("communicationTypes"),
+  };
+  const out = [];
+  for (let r = 1; r < rows.length; r++) {
+    const cells = rows[r];
+    if (!cells || cells.every(c => !String(c).trim())) continue;
+    const get = i => (i >= 0 && i < cells.length) ? String(cells[i]).trim() : "";
+    const rec = {
+      contact:    get(ci.contact) || null,
+      ie:         get(ci.ie) || null,
+      fle:        get(ci.fle) || null,
+      investment: get(ci.investment) || null,
+      yesTypes:   parseYesCommTypes(get(ci.comm)),
+    };
+    if (rec.contact) out.push(rec);
+  }
+  return out;
+}
+
+/**
+ * Parse the investments export CSV (headers: id, fundLegalEntityId, investmentEntityId, …).
+ * Returns rows of { investment, ie, fle }.
+ */
+function parseInvestmentsCsv(text) {
+  const rows = parseCsv(text);
+  if (rows.length < 2) return [];
+  const header = rows[0].map(h => String(h).trim());
+  const idx = name => header.indexOf(name);
+  const ci = { id: idx("id"), ie: idx("investmentEntityId"), fle: idx("fundLegalEntityId") };
+  const out = [];
+  for (let r = 1; r < rows.length; r++) {
+    const cells = rows[r];
+    if (!cells || cells.every(c => !String(c).trim())) continue;
+    const get = i => (i >= 0 && i < cells.length) ? String(cells[i]).trim() : "";
+    const rec = { investment: get(ci.id) || null, ie: get(ci.ie) || null, fle: get(ci.fle) || null };
+    if (rec.investment) out.push(rec);
+  }
+  return out;
+}
+
+/** Build investmentId → { ie, fle } map from parsed investments-export rows. */
+function buildInvestmentMap(invRows) {
+  const m = new Map();
+  for (const r of invRows) if (r.investment) m.set(r.investment, { ie: r.ie, fle: r.fle });
+  return m;
+}
+
+/** Count documents by their sharing target type. */
+const TARGET_TYPES = ["Contacts", "InvestmentEntitiesInFundLegalEntity", "Investments", "InvestmentEntities", "AllContacts"];
+function countTargetTypes(docs) {
+  const counts = {}; TARGET_TYPES.forEach(t => counts[t] = 0); counts.Other = 0;
+  for (const d of docs) {
+    const t = d.sharedWith?.targetType;
+    if (TARGET_TYPES.includes(t)) counts[t]++;
+    else counts.Other++;
+  }
+  return counts;
+}
+
+/**
+ * Build matrix lookups keyed by communication type, so a document only maps to
+ * contacts whose matrix row has the document's communicationTypeId set to "yes".
+ *   commMatrix → key `${ie}|${fle}|${commTypeId}`   → Set(contactId)
+ *   invMatrix  → key `${investmentId}|${commTypeId}` → Set(contactId)
+ */
+function buildMatrixMaps(cmRows, invRows) {
+  const add = (map, key, val) => { if (!map.has(key)) map.set(key, new Set()); map.get(key).add(val); };
+
+  const ieFleCommToContacts = new Map();
+  for (const r of cmRows) {
+    if (!r.contact || !r.ie || !r.fle) continue;
+    r.yesTypes.forEach(ct => add(ieFleCommToContacts, `${r.ie}|${r.fle}|${ct}`, r.contact));
+  }
+
+  const invCommToContacts = new Map();
+  for (const r of invRows) {
+    if (!r.contact || !r.investment) continue;
+    r.yesTypes.forEach(ct => add(invCommToContacts, `${r.investment}|${ct}`, r.contact));
+  }
+
+  return { ieFleCommToContacts, invCommToContacts };
+}
+
+/**
+ * BULK MODE: invert the full document list into per-contact access locally.
+ *   - AllContacts                          → every contact
+ *   - Contacts.contactIds                  → those contacts directly (contact lists / FLEs are already expanded into contactIds by the backend)
+ *   - InvestmentEntities                   → contacts assigned to those entities (from contact data)
+ *   - InvestmentEntitiesInFundLegalEntity  → contacts whose comm-matrix row for (IE, FLE) has the doc's communicationTypeId = "yes"
+ *   - Investments                          → either (a) the investment communication matrix directly, or
+ *                                            (b) when 'Investments via IE×FLE' is on: investment → (IE, FLE) from the
+ *                                            investments export, then the IE×FLE×commType communication matrix
+ * Anything not resolvable (Investments when no matrix is enabled,
+ * or no matrix row matching the entity/fund/investment + communication type) is flagged.
+ */
+function invertDocsToContacts(contacts, allDocs, matrices, opts = {}) {
+  const { ieFleCommToContacts, invCommToContacts, investmentMap } = matrices || {};
+  const useInvMatrix = !!opts.useInvestmentMatrix;
+  const useInvViaIEFLE = !!opts.useInvestmentsViaIEFLE;
+
+  const byContactId = new Map();
+  contacts.forEach((c, i) => byContactId.set(c.id, i));
+
+  const ieToContactIdx = new Map();   // from contact assignments → for plain InvestmentEntities target
+  contacts.forEach((c, i) => {
+    (c.assignedInvestmentEntities || []).forEach(a => {
+      if (!ieToContactIdx.has(a.id)) ieToContactIdx.set(a.id, []);
+      ieToContactIdx.get(a.id).push(i);
+    });
+  });
+
+  const docsPerContact = contacts.map(() => []);
+  const seen = contacts.map(() => new Set());
+  const unresolved = [];
+
+  const addByIdx = (idx, doc) => {
+    if (idx == null || idx < 0) return;
+    if (seen[idx].has(doc.id)) return;
+    seen[idx].add(doc.id);
+    docsPerContact[idx].push(doc);
+  };
+  const addByContactId = (cid, doc) => addByIdx(byContactId.get(cid), doc);
+
+  for (const doc of allDocs) {
+    const sw = doc.sharedWith || {};
+    const t = sw.targetType;
+    let partial = false, reason = "";
+
+    if (t === "AllContacts") {
+      contacts.forEach((_, i) => addByIdx(i, doc));
+
+    } else if (t === "Contacts") {
+      (sw.contactIds || []).forEach(cid => addByContactId(cid, doc));
+
+    } else if (t === "InvestmentEntities") {
+      (sw.investmentEntityIds || []).forEach(ieId =>
+        (ieToContactIdx.get(ieId) || []).forEach(i => addByIdx(i, doc)));
+
+    } else if (t === "InvestmentEntitiesInFundLegalEntity") {
+      // each pair carries IE + FLE + communicationTypeId; a contact qualifies only when
+      // its matrix row for that (IE, FLE) has that communication type set to "yes".
+      const pairs = sw.investmentEntityInFundLegalEntity || [];
+      let anyMatched = false;
+      pairs.forEach(p => {
+        const set = ieFleCommToContacts &&
+          ieFleCommToContacts.get(`${p.investmentEntityId}|${p.fundLegalEntityId}|${p.communicationTypeId}`);
+        if (set) { anyMatched = true; set.forEach(cid => addByContactId(cid, doc)); }
+      });
+      if (!ieFleCommToContacts || !anyMatched) {
+        partial = true; reason = "no communication-matrix rows matched this entity/fund/communication-type";
+      }
+
+    } else if (t === "Investments") {
+      const commTypes = sw.communicationTypeIds || [];
+      const investmentIds = sw.investmentIds || [];
+
+      if (useInvViaIEFLE) {
+        // Special case: map each investment → (IE, FLE) via the investments export,
+        // then resolve contacts through the IE×FLE×commType communication matrix.
+        if (investmentMap && ieFleCommToContacts) {
+          let anyMatched = false;
+          investmentIds.forEach(invId => {
+            const inv = investmentMap.get(invId);
+            if (!inv || !inv.ie || !inv.fle) return;
+            commTypes.forEach(ct => {
+              const set = ieFleCommToContacts.get(`${inv.ie}|${inv.fle}|${ct}`);
+              if (set) { anyMatched = true; set.forEach(cid => addByContactId(cid, doc)); }
+            });
+          });
+          if (!anyMatched) { partial = true; reason = "no communication-matrix rows matched the investments' entity/fund/communication-type"; }
+        } else {
+          partial = true; reason = "investment-based sharing — investments export or communication matrix unavailable";
+        }
+
+      } else if (useInvMatrix && invCommToContacts) {
+        // Usual case: resolve directly via the investment communication matrix.
+        let anyMatched = false;
+        investmentIds.forEach(invId => {
+          commTypes.forEach(ct => {
+            const set = invCommToContacts.get(`${invId}|${ct}`);
+            if (set) { anyMatched = true; set.forEach(cid => addByContactId(cid, doc)); }
+          });
+        });
+        if (!anyMatched) { partial = true; reason = "no investment-matrix rows matched these investments/communication-types"; }
+
+      } else {
+        partial = true; reason = "investment-based sharing — enable 'Use Investment matrix' to resolve";
+      }
+
+    } else {
+      partial = true; reason = "unknown target type";
+    }
+
+    if (partial) unresolved.push({ id: doc.id, name: doc.name, targetType: t || "unknown", reason });
+  }
+
+  return { docsPerContact, unresolved };
+}
+
+/* ════════════════════════════════════════════════
+   Report builder
+════════════════════════════════════════════════ */
+function buildReport(contacts, docsPerContact, firmId, server, opts = {}) {
+  const generatedAt = new Date().toISOString();
+  const contactReports = contacts.map((c, i) => {
+    const docs = docsPerContact[i] || [];
+    return {
+      contact: {
+        id:        c.id,
+        firstName: c.firstName,
+        lastName:  c.lastName,
+        email:     c.email,
+        company:   c.company || null,
+        title:     c.title   || null,
+      },
+      documentCount: docs.length,
+      documents: docs.map(d => ({
+        id:             d.id,
+        name:           d.name,
+        documentTypeId: d.documentTypeId || null,
+        sharedWithType: d.sharedWith?.targetType || null,
+        relatedFunds:   relatedFundsFromShare(d.sharedWith, opts.fleNames),
+        sharedAt:       d.sharedAt,
+        effectiveDate:  d.effectiveDate  || null,
+        lastModifiedAt: d.lastModifiedAt,
+        sharedBy:       d.sharedBy,
+        checksum:       d.checksum,
+      })),
+    };
+  });
+
+  // unique file set across all contacts (docs attached to >=1 contact)
+  const allFileIds = new Set();
+  contactReports.forEach(r => r.documents.forEach(d => allFileIds.add(d.id)));
+
+  // total documents from the portal-documents API (bulk mode); fall back to unique found
+  const totalDocuments = opts.totalDocumentsFromApi != null ? opts.totalDocumentsFromApi : allFileIds.size;
+
+  const contactsWithDocuments = contactReports.filter(r => r.documentCount > 0).length;
+
+  const meta = {
+    generatedAt,
+    server,
+    firmId,
+    queryMode: opts.queryMode || "bulk",
+    apiRequestCount: opts.apiRequestCount ?? null,
+    totalContacts: contacts.length,
+    contactsWithDocuments,
+    contactsWithoutDocuments: contacts.length - contactsWithDocuments,
+    totalDocuments,
+    totalUniqueDocuments: allFileIds.size,
+  };
+
+  if (opts.targetTypeCounts) {
+    meta.documentsByTargetType = opts.targetTypeCounts;
+  }
+
+  if (opts.matrixInfo && Object.keys(opts.matrixInfo).length) {
+    meta.matrices = opts.matrixInfo;
+  }
+
+  if (opts.unresolved && opts.unresolved.length) {
+    meta.partiallyResolvedDocuments = opts.unresolved.length;
+    meta.partiallyResolvedNote =
+      "These documents use sharing targets that couldn't be fully mapped to contacts with the current settings " +
+      "(e.g. contact-list / fund-legal-entity targets, or investment-based sharing when the investment matrix is off). " +
+      "See each entry's reason; Per-contact mode resolves every type exactly.";
+    meta.partiallyResolvedDetails = opts.unresolved;
+  }
+
+  return { meta, contactDocuments: contactReports };
+}
+
+/* ════════════════════════════════════════════════
+   JSON syntax highlighter
+════════════════════════════════════════════════ */
+function highlightJson(json) {
+  return json
+    .replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;")
+    .replace(/("(\\u[a-fA-F0-9]{4}|\\[^u]|[^\\"])*"(\s*:)?|\b(true|false|null)\b|-?\d+(?:\.\d*)?(?:[eE][+\-]?\d+)?)/g, match => {
+      let cls = "j-num";
+      if (/^"/.test(match)) cls = /:$/.test(match) ? "j-key" : "j-str";
+      else if (/true|false/.test(match)) cls = "j-bool";
+      else if (/null/.test(match)) cls = "j-null";
+      return `<span class="${cls}">${match}</span>`;
+    });
+}
+
+/* ════════════════════════════════════════════════
+   Render
+════════════════════════════════════════════════ */
+let reportData = null;
+
+function renderReport(report) {
+  const m = report.meta;
+
+  // warning banner for partially-resolved docs (bulk mode only)
+  const wb = $("warnBanner");
+  if (m.partiallyResolvedDocuments) {
+    const details = m.partiallyResolvedDetails || [];
+    const invDisabled = details.filter(d =>
+      d.targetType === "Investments" && /enable 'Use Investment matrix'/.test(d.reason || ""));
+    let html =
+      `<b>${m.partiallyResolvedDocuments} document(s)</b> could not be fully mapped to contacts. `;
+    if (invDisabled.length) {
+      html +=
+        `<br><b>${invDisabled.length}</b> of them are shared by <b>Investments</b> but the investment matrix wasn't used — ` +
+        `tick <b>“Use Investment matrix”</b> and re-run to resolve them (only works on firms that have it enabled).`;
+    } else {
+      html += `See <code>meta.partiallyResolvedDetails</code> in the JSON for the reason on each.`;
+    }
+    wb.style.display = "block";
+    wb.innerHTML = html;
+  } else {
+    wb.style.display = "none";
+  }
+
+  // summary chips — simple labels, full explanation in hover tooltip
+  const chips = [
+    { n: m.totalContacts,            label: "Contacts",     tip: "Total number of contacts in the firm." },
+    { n: m.contactsWithDocuments,    label: "With docs",    tip: "Contacts who can access at least one document." },
+    { n: m.contactsWithoutDocuments, label: "Without docs", tip: "Contacts who can't access any document." },
+    { n: m.totalDocuments,           label: "Documents",    tip: "Total portal documents returned by the list-portal-documents API (each counted once)." },
+  ];
+  $("summary").innerHTML = chips.map(c =>
+    `<div class="chip" data-tip="${esc(c.tip)}"><b>${c.n}</b><span>${esc(c.label)}</span></div>`
+  ).join("");
+
+  // documents broken down by sharing target type
+  const tc = m.documentsByTargetType;
+  if (tc) {
+    const targetChips = [
+      { key: "Contacts",                            label: "By contact",      tip: "Documents shared with target type ‘Contacts’ — specific contacts, contact lists, or fund legal entities." },
+      { key: "InvestmentEntitiesInFundLegalEntity", label: "By entity × fund", tip: "Documents shared with target type ‘InvestmentEntitiesInFundLegalEntity’ — an investment entity within a specific fund legal entity." },
+      { key: "Investments",                         label: "By investment",   tip: "Documents shared with target type ‘Investments’." },
+      { key: "InvestmentEntities",                  label: "By entity",       tip: "Documents shared with target type ‘InvestmentEntities’." },
+      { key: "AllContacts",                         label: "All contacts",    tip: "Documents shared with target type ‘AllContacts’ — every contact in the firm." },
+    ];
+    if (tc.Other) targetChips.push({ key: "Other", label: "Other", tip: "Documents with an unrecognized or missing sharing target type." });
+
+    $("summaryTargets").innerHTML =
+      `<span class="group-label">By target type</span>` +
+      targetChips.map(c =>
+        `<div class="chip-sm" data-tip="${esc(c.tip)}"><b>${tc[c.key] || 0}</b><span>${esc(c.label)}</span></div>`
+      ).join("");
+    $("summaryTargets").style.display = "flex";
+  } else {
+    $("summaryTargets").style.display = "none";
+  }
+
+  // matrix record counts (bulk mode only)
+  const mx = m.matrices;
+  if (mx) {
+    const matrixChips = [];
+
+    // communication matrix (IE × FLE × communication type)
+    if (mx.ieFleTargetsPresent) {
+      matrixChips.push({
+        n: mx.communicationMatrixRows ?? 0, label: "IE×FLE×Type",
+        tip: "Rows in the communication-matrices export. We POST …/communication-matrices/export, poll the long request until it completes, download the result CSV, and count the parsed rows. Each row is one contact's access to an investment entity × fund legal entity, with its yes/no map of communication types.",
+      });
+    } else {
+      matrixChips.push({
+        n: "—", label: "IE×FLE×Type",
+        tip: "Not fetched — no documents use the InvestmentEntitiesInFundLegalEntity target, so the communication-matrices export wasn't needed.",
+      });
+    }
+
+    // investment matrix (investment × communication type)
+    if (mx.investmentTargetsPresent && mx.investmentMatrixUsed) {
+      matrixChips.push({
+        n: mx.investmentMatrixRows ?? 0, label: "Inv×Type",
+        tip: "Rows in the investment-communication-matrices export. We POST …/investment-communication-matrices/export, poll the long request, download the result CSV, and count the parsed rows. Each row is one contact's access to an investment, with its yes/no map of communication types.",
+      });
+    } else if (mx.investmentTargetsPresent && !mx.investmentMatrixUsed) {
+      matrixChips.push({
+        n: "—", label: "Inv×Type",
+        tip: "Not fetched — documents use investment-based sharing but ‘Use Investment matrix’ was off, so the export wasn't run.",
+      });
+    } else {
+      matrixChips.push({
+        n: "—", label: "Inv×Type",
+        tip: "Not fetched — no documents use the Investments target, so the investment-matrix export wasn't needed.",
+      });
+    }
+
+    $("summaryMatrices").innerHTML =
+      `<span class="group-label">Matrix records</span>` +
+      matrixChips.map(c =>
+        `<div class="chip-sm" data-tip="${esc(c.tip)}"><b>${c.n}</b><span>${esc(c.label)}</span></div>`
+      ).join("");
+    $("summaryMatrices").style.display = "flex";
+  } else {
+    $("summaryMatrices").style.display = "none";
+  }
+
+  renderCards(report);
+
+  // JSON preview
+  const fullJson = JSON.stringify(report, null, 2);
+  $("jsonWrap").innerHTML = highlightJson(fullJson);
+
+  $("results").hidden = false;
+  $("btnDownloadJson").disabled = false;
+}
+
+function renderCards(report) {
+  const search = $("search").value.trim().toLowerCase();
+  const filter = $("filterDocs").value;
+
+  let rows = report.contactDocuments;
+
+  if (filter === "with")    rows = rows.filter(r => r.documentCount > 0);
+  if (filter === "without") rows = rows.filter(r => r.documentCount === 0);
+
+  if (search) {
+    rows = rows.filter(r =>
+      `${r.contact.firstName} ${r.contact.lastName}`.toLowerCase().includes(search) ||
+      r.contact.email.toLowerCase().includes(search) ||
+      r.contact.id.toLowerCase().includes(search) ||
+      r.documents.some(d =>
+        (d.name||"").toLowerCase().includes(search) ||
+        (d.id||"").toLowerCase().includes(search)
+      )
+    );
+  }
+
+  if (rows.length === 0) {
+    $("cards").innerHTML = `<div style="color:var(--ink-soft);padding:16px 0">No contacts match the current filter.</div>`;
+    return;
+  }
+
+  $("cards").innerHTML = rows.map((r, idx) => {
+    const c = r.contact;
+    const ini = esc(initials(c.firstName, c.lastName).toUpperCase() || "?");
+    const name = esc(`${c.firstName||""} ${c.lastName||""}`.trim() || c.id);
+    const badgeCls = r.documentCount > 0 ? "" : " zero";
+    const filesHtml = r.documentCount === 0
+      ? `<div class="no-files">No portal documents shared with this contact.</div>`
+      : `<table class="file-table">
+          <thead><tr>
+            <th>File Name</th>
+            <th>Shared With</th>
+            <th>Related Funds</th>
+            <th>Shared At</th>
+            <th>Effective Date</th>
+            <th>File ID</th>
+          </tr></thead>
+          <tbody>
+          ${r.documents.map(d => `
+            <tr>
+              <td class="file-name">${esc(d.name||"—")}</td>
+              <td>${targetTypeLabel(d.sharedWithType)}</td>
+              <td>${relatedFundsLabel(d.relatedFunds)}</td>
+              <td class="file-date">${fmtDate(d.sharedAt)}</td>
+              <td class="file-date">${d.effectiveDate||"—"}</td>
+              <td class="file-id">${esc(d.id||"—")}<button class="copy-btn" data-copy="${esc(d.id||"")}" onclick="event.stopPropagation();copyFromBtn(this)">copy</button></td>
+            </tr>`).join("")}
+          </tbody>
+        </table>`;
+
+    return `
+      <div class="card" id="card-${idx}">
+        <div class="card-head" onclick="toggleCard(${idx})">
+          <div class="card-avatar">${ini}</div>
+          <div>
+            <div class="card-name">${name}</div>
+            <div class="card-email">${esc(c.email||"")}${c.company ? ' <span style="color:var(--ink-soft)">· '+esc(c.company)+'</span>' : ""}</div>
+          </div>
+          <div class="card-meta">
+            <span class="badge${badgeCls}">${r.documentCount}</span>
+            <span class="chevron" id="chev-${idx}">▾</span>
+          </div>
+        </div>
+        <div class="card-body" id="body-${idx}">${filesHtml}</div>
+      </div>`;
+  }).join("");
+}
+
+function toggleCard(idx) {
+  const body = $(`body-${idx}`);
+  const chev = $(`chev-${idx}`);
+  const isOpen = body.classList.toggle("open");
+  chev.classList.toggle("open", isOpen);
+}
+
+/* ════════════════════════════════════════════════
+   Main run
+════════════════════════════════════════════════ */
+async function run() {
+  const server = $("server").value.trim().replace(/\/+$/, "");
+  const firmId = $("firmId").value.trim();
+  const apiKey = $("apiKey").value.trim();
+  const mode   = $("mode").value;
+  const useInvestmentMatrix = $("useInvMatrix").checked;
+  const useInvestmentsViaIEFLE = $("useInvViaIEFLE").checked;
+
+  if (!server || !firmId || !apiKey) {
+    setStatus("Server, Firm ID, and API key are all required.", true);
+    return;
+  }
+
+  $("run").disabled = true;
+  $("btnDownloadJson").disabled = true;
+  $("results").hidden = true;
+  $("warnBanner").style.display = "none";
+  reportData = null;
+  showProgress(false);
+  netCalls = 0;   // reset the load counter
+
+  try {
+    // Step 1: all contacts
+    setStatus("Step 1 / 3 — Loading contacts…");
+    const contacts = await fetchAllContacts(server, firmId, apiKey);
+
+    if (contacts.length === 0) {
+      setStatus("No contacts found for this firm.", true);
+      $("run").disabled = false;
+      return;
+    }
+
+    // Fund legal entity names (id → name) for the Related Funds column
+    setStatus(`Loaded ${contacts.length} contact(s). Loading fund legal entities…`);
+    let fleNames = new Map();
+    try {
+      fleNames = await fetchFundLegalEntityNames(server, firmId, apiKey,
+        (n) => setStatus(`Loading fund legal entities… ${n}`));
+    } catch (e) {
+      // non-fatal: fall back to showing IDs
+      fleNames = new Map();
+    }
+
+    let docsPerContact, unresolved = [];
+    let matrixInfo = {};
+    let totalDocumentsFromApi = null;
+    let targetTypeCounts = null;
+
+    if (mode === "bulk") {
+      // Step 2 (bulk): fetch every document ONCE
+      setStatus(`Step 2 / 3 — Loaded ${contacts.length} contact(s). Fetching all documents…`);
+      showProgress(true);
+      $("progressBar").style.width = "100%";
+      const allDocs = await fetchAllPortalDocuments(
+        server, firmId, apiKey,
+        (count, p) => setStatus(`Step 2 / 3 — Fetching all documents… ${count} loaded (${p} page${p>1?"s":""})`)
+      );
+      showProgress(false);
+
+      // Detect which sharing targets are present
+      const hasIEFLE        = allDocs.some(d => d.sharedWith?.targetType === "InvestmentEntitiesInFundLegalEntity");
+      const hasInvestments  = allDocs.some(d => d.sharedWith?.targetType === "Investments");
+
+      // The special path (Investments → IE×FLE) needs the communication matrix too.
+      const needCommMatrix = hasIEFLE || (hasInvestments && useInvestmentsViaIEFLE);
+
+      // Step 3: resolve entity/investment targets via matrix exports
+      let cmRows = [], invRows = [], investmentRows = [];
+
+      if (needCommMatrix) {
+        setStatus("Step 3 / 3 — Exporting communication matrices…");
+        cmRows = await runExportJob(
+          server, firmId, apiKey, "communication-matrices/export",
+          (st, prog) => setStatus(`Step 3 / 3 — Communication matrices export: ${st}${prog?.processed!=null?` (${prog.processed} processed)`:""}…`)
+        );
+        matrixInfo.communicationMatrixRows = cmRows.length;
+      }
+
+      // Investments-shared docs: special IE×FLE path takes priority when its checkbox is on.
+      if (hasInvestments && useInvestmentsViaIEFLE) {
+        setStatus("Step 3 / 3 — Exporting investments…");
+        investmentRows = await runExportJob(
+          server, firmId, apiKey, "investments/export",
+          (st, prog) => setStatus(`Step 3 / 3 — Investments export: ${st}${prog?.processed!=null?` (${prog.processed} processed)`:""}…`),
+          parseInvestmentsCsv
+        );
+        matrixInfo.investmentRecords = investmentRows.length;
+      } else if (hasInvestments && useInvestmentMatrix) {
+        setStatus("Step 3 / 3 — Exporting investment communication matrices…");
+        invRows = await runExportJob(
+          server, firmId, apiKey, "investment-communication-matrices/export",
+          (st, prog) => setStatus(`Step 3 / 3 — Investment matrices export: ${st}${prog?.processed!=null?` (${prog.processed} processed)`:""}…`)
+        );
+        matrixInfo.investmentMatrixRows = invRows.length;
+      }
+
+      matrixInfo.investmentMatrixUsed = useInvestmentMatrix;
+      matrixInfo.investmentsViaIEFLE = useInvestmentsViaIEFLE;
+      matrixInfo.investmentTargetsPresent = hasInvestments;
+      matrixInfo.ieFleTargetsPresent = hasIEFLE;
+
+      const matrices = buildMatrixMaps(cmRows, invRows);
+      matrices.investmentMap = buildInvestmentMap(investmentRows);
+      const inv = invertDocsToContacts(contacts, allDocs, matrices, { useInvestmentMatrix, useInvestmentsViaIEFLE });
+      docsPerContact = inv.docsPerContact;
+      unresolved = inv.unresolved;
+      totalDocumentsFromApi = allDocs.length;
+      targetTypeCounts = countTargetTypes(allDocs);
+
+    } else {
+      // Per-contact mode (exact): one query per contact, throttled
+      setStatus(`Step 2 / 2 — Loaded ${contacts.length} contact(s). Querying per contact…`);
+      showProgress(true);
+      setProgress(0, contacts.length);
+      docsPerContact = await fetchAllContactDocs(
+        server, firmId, apiKey, contacts,
+        (done, total) => {
+          setStatus(`Step 2 / 2 — Querying documents… ${done} / ${total} contacts`);
+          setProgress(done, total);
+        }
+      );
+      showProgress(false);
+
+      // dedupe documents found across contacts to count target types
+      const uniqDocs = new Map();
+      docsPerContact.forEach(list => list.forEach(d => { if (!uniqDocs.has(d.id)) uniqDocs.set(d.id, d); }));
+      targetTypeCounts = countTargetTypes([...uniqDocs.values()]);
+    }
+
+    // Build & render report
+    reportData = buildReport(contacts, docsPerContact, firmId, server, {
+      queryMode: mode, unresolved, apiRequestCount: netCalls, matrixInfo, totalDocumentsFromApi, targetTypeCounts, fleNames,
+    });
+
+    setStatus(`Done — ${contacts.length} contacts, ${reportData.meta.totalUniqueDocuments} unique file(s) (${netCalls} API call${netCalls!==1?"s":""} total).`);
+    renderReport(reportData);
+
+  } catch (e) {
+    showProgress(false);
+    if (e instanceof TypeError) {
+      setStatus(
+        "Network/CORS error. Serve this file over HTTP — run: python3 -m http.server 8000 — then open http://localhost:8000/anduin-portal-documents.html",
+        true
+      );
+    } else {
+      setStatus(e.message, true);
+    }
+  } finally {
+    $("run").disabled = false;
+  }
+}
+
+/* ════════════════════════════════════════════════
+   Download / copy
+════════════════════════════════════════════════ */
+function downloadJson() {
+  if (!reportData) return;
+  const blob = new Blob([JSON.stringify(reportData, null, 2)], { type:"application/json" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `portal-doc-report-${reportData.meta.firmId}-${new Date().toISOString().slice(0,10)}.json`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+$("run").onclick = run;
+$("btnDownloadJson").onclick = downloadJson;
+$("btnCopyJson").onclick = async () => {
+  if (!reportData) return;
+  const ok = await copyText(JSON.stringify(reportData, null, 2));
+  const btn = $("btnCopyJson");
+  const original = btn.textContent;
+  btn.textContent = ok ? "Copied!" : "Copy failed";
+  setTimeout(() => { btn.textContent = original; }, 1200);
+};
+$("search").oninput    = () => { if (reportData) renderCards(reportData); };
+$("filterDocs").onchange = () => { if (reportData) renderCards(reportData); };
+
+const MODE_HINTS = {
+  bulk:  "Fetches the full document list once (a few cursor pages), then resolves sharing locally. Entity- and investment-based sharing is resolved via the communication-matrix exports. Far fewer server calls.",
+  exact: "Runs one document query per contact (throttled). Most accurate for every sharing type, but makes one request per contact — heavier on the server. Matrix exports aren't needed.",
+};
+function updateModeHint() {
+  const mode = $("mode").value;
+  $("modeHint").textContent = MODE_HINTS[mode];
+  $("invMatrixWrap").style.display = mode === "bulk" ? "block" : "none";
+}
+$("mode").onchange = updateModeHint;
+updateModeHint();
+
+["server","firmId","apiKey"].forEach(id => {
+  $(id).addEventListener("keydown", e => { if (e.key === "Enter") run(); });
+});
+</script>
+</body>
+</html>

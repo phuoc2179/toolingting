@@ -1,0 +1,451 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Contact → Portal Documents Report</title>
+<style>
+  :root {
+    --ink:#15212b; --ink-soft:#5a6b78; --line:#dfe5ea; --bg:#f5f7f9; --panel:#ffffff;
+    --accent:#1f6feb; --ok:#127a3e; --ok-bg:#e7f4ec; --bad:#b42318; --bad-bg:#fdeceb;
+    --warn:#9a6700; --warn-bg:#fdf3e2; --absent:#9aa7b1;
+    --mono:"SF Mono",ui-monospace,"Cascadia Code",Menlo,Consolas,monospace;
+    --sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    --radius:10px;
+  }
+  *, *::before, *::after { box-sizing: border-box }
+  body { margin:0; background:var(--bg); color:var(--ink); font-family:var(--sans); font-size:14px; line-height:1.5 }
+  .wrap { max-width:1200px; margin:0 auto; padding:28px 22px 80px }
+  header h1 { font-size:20px; margin:0 0 2px; letter-spacing:-.01em }
+  header p  { margin:0 0 20px; color:var(--ink-soft) }
+  .panel { background:var(--panel); border:1px solid var(--line); border-radius:var(--radius); padding:18px }
+  .section-title { font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.06em; color:var(--ink-soft); margin:18px 0 8px }
+  .grid { display:grid; grid-template-columns:1fr 1fr 1fr; gap:14px 18px }
+  label { display:block; font-weight:600; font-size:12px; margin:0 0 5px; color:var(--ink) }
+  label .hint { font-weight:400; color:var(--ink-soft) }
+  input[type=text], textarea, select {
+    width:100%; padding:9px 10px; border:1px solid var(--line); border-radius:7px;
+    font-family:var(--mono); font-size:12px; background:#fff; color:var(--ink);
+  }
+  input[type=text]:focus, textarea:focus, select:focus { outline:2px solid var(--accent); outline-offset:-1px; border-color:var(--accent) }
+  textarea { min-height:52px; resize:vertical }
+  select { font-family:var(--sans) }
+  button { font-family:var(--sans); font-size:14px; font-weight:600; border:0; border-radius:7px; padding:10px 18px; cursor:pointer; transition:opacity .15s }
+  .btn-go    { background:var(--accent); color:#fff }
+  .btn-go:hover:not(:disabled) { background:#1558c0 }
+  .btn-ghost { background:#fff; border:1px solid var(--line); color:var(--ink); font-weight:500 }
+  .btn-ghost:hover:not(:disabled) { background:var(--bg) }
+  button:disabled { opacity:.45; cursor:not-allowed }
+  .row { display:flex; gap:10px; align-items:center; margin-top:16px; flex-wrap:wrap }
+  .muted { color:var(--ink-soft); font-size:12px }
+  .status { margin:14px 0 0; color:var(--ink-soft); font-size:13px; min-height:18px }
+  .status.err { color:var(--bad) }
+  .progress-wrap { margin:10px 0 0; height:6px; background:var(--line); border-radius:3px; overflow:hidden; display:none }
+  .progress-bar  { height:100%; background:var(--accent); border-radius:3px; width:0%; transition:width .2s }
+  .progress-bar.indet { width:35% !important; animation:indet 1.1s ease-in-out infinite }
+  @keyframes indet { 0%{margin-left:-35%} 100%{margin-left:100%} }
+  .summary { display:flex; gap:10px; flex-wrap:wrap; margin:18px 0 10px }
+  .chip { background:#fff; border:1px solid var(--line); border-radius:8px; padding:9px 14px; min-width:90px; position:relative; cursor:help }
+  .chip[data-tip]:hover::after {
+    content: attr(data-tip); position:absolute; left:0; top:calc(100% + 8px);
+    background:var(--ink); color:#fff; padding:8px 11px; border-radius:6px;
+    font-size:11px; line-height:1.45; font-weight:400; letter-spacing:0;
+    width:max-content; max-width:250px; z-index:20; box-shadow:0 6px 18px rgba(21,33,43,.22); white-space:normal;
+  }
+  .chip[data-tip]:hover::before { content:""; position:absolute; left:16px; top:calc(100% + 2px); border:6px solid transparent; border-bottom-color:var(--ink); z-index:20 }
+  .warn-banner { background:var(--warn-bg); border:1px solid #f0d9a8; color:var(--warn); border-radius:8px; padding:10px 14px; margin:0 0 12px; font-size:12px; line-height:1.6 }
+  .chip b { display:block; font-size:22px; line-height:1.1 }
+  .chip span { font-size:11px; color:var(--ink-soft) }
+  .summary-targets { margin:0 0 10px; align-items:center }
+  .group-label { font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.05em; color:var(--ink-soft); align-self:center; margin-right:2px }
+  .chip-sm { background:#fbfcfd; border:1px solid var(--line); border-radius:8px; padding:7px 12px; min-width:74px; position:relative; cursor:help }
+  .chip-sm b { display:block; font-size:17px; line-height:1.1; color:var(--ink) }
+  .chip-sm span { font-size:10px; color:var(--ink-soft) }
+  .chip-sm[data-tip]:hover::after {
+    content: attr(data-tip); position:absolute; left:0; top:calc(100% + 8px);
+    background:var(--ink); color:#fff; padding:8px 11px; border-radius:6px;
+    font-size:11px; line-height:1.45; font-weight:400; width:max-content; max-width:260px; z-index:20;
+    box-shadow:0 6px 18px rgba(21,33,43,.22); white-space:normal;
+  }
+  .chip-sm[data-tip]:hover::before { content:""; position:absolute; left:16px; top:calc(100% + 2px); border:6px solid transparent; border-bottom-color:var(--ink); z-index:20 }
+  .toolbar { display:flex; gap:12px; align-items:center; margin:0 0 10px; flex-wrap:wrap }
+  .toolbar input[type=text] { width:220px; font-size:12px; padding:7px 10px }
+  .toolbar select { width:auto; font-family:var(--sans); font-size:12px; padding:7px 10px }
+  .cards { display:flex; flex-direction:column; gap:10px }
+  .card { background:#fff; border:1px solid var(--line); border-radius:var(--radius); overflow:hidden }
+  .card-head { display:flex; align-items:center; gap:12px; padding:12px 16px; cursor:pointer; user-select:none }
+  .card-head:hover { background:#f7f9fb }
+  .card-avatar { width:34px; height:34px; border-radius:50%; background:var(--accent); color:#fff; font-weight:700; font-size:13px; display:flex; align-items:center; justify-content:center; flex-shrink:0 }
+  .card-name  { font-weight:600; font-size:14px }
+  .card-email { font-size:12px; color:var(--ink-soft) }
+  .card-meta  { margin-left:auto; display:flex; align-items:center; gap:10px }
+  .badge { display:inline-flex; align-items:center; justify-content:center; background:var(--accent); color:#fff; border-radius:20px; font-size:11px; font-weight:700; padding:2px 9px; min-width:26px }
+  .badge.zero { background:var(--line); color:var(--ink-soft) }
+  .chevron { color:var(--ink-soft); font-size:11px; transition:transform .2s }
+  .chevron.open { transform:rotate(180deg) }
+  .card-body { display:none; border-top:1px solid var(--line); padding:0 }
+  .card-body.open { display:block }
+  .file-table { width:100%; border-collapse:collapse; font-size:12px }
+  .file-table th { background:#fafbfc; font-size:10px; text-transform:uppercase; letter-spacing:.04em; color:var(--ink-soft); padding:7px 14px; text-align:left; border-bottom:1px solid var(--line) }
+  .file-table td { padding:8px 14px; border-bottom:1px solid var(--line); vertical-align:middle }
+  .file-table tr:last-child td { border-bottom:0 }
+  .file-table tr:hover td { background:#fafbfc }
+  .file-name { font-weight:500 }
+  .file-id   { font-family:var(--mono); font-size:10px; color:var(--ink-soft) }
+  .file-date { font-family:var(--mono); font-size:11px; white-space:nowrap }
+  .no-files  { padding:16px 14px; color:var(--ink-soft); font-size:12px; font-style:italic }
+  .tt { display:inline-block; font-size:11px; font-weight:600; padding:2px 9px; border-radius:20px; white-space:nowrap }
+  .tt-all { background:#e7f0ff; color:#1558c0 }
+  .tt-contacts { background:var(--ok-bg); color:var(--ok) }
+  .tt-ie { background:#fff3e0; color:#9a5b00 }
+  .tt-iefle { background:#f3e8ff; color:#7322b8 }
+  .tt-inv { background:#e9f6f1; color:#0f7a52 }
+  .tt-other { background:var(--line); color:var(--ink-soft) }
+  .fund-tag { display:inline-block; font-family:var(--mono); font-size:10px; color:var(--ink); background:#f0f3f5; border:1px solid var(--line); border-radius:5px; padding:1px 6px; margin:1px 2px 1px 0; white-space:nowrap }
+  .copy-btn { background:none; border:1px solid var(--line); border-radius:4px; padding:1px 6px; font-size:10px; font-weight:500; color:var(--ink-soft); cursor:pointer; margin-left:6px; vertical-align:middle }
+  .copy-btn:hover { background:var(--bg) }
+  .copy-btn.copied { color:var(--ok); border-color:var(--ok) }
+  .json-section { margin-top:24px }
+  .json-section h2 { font-size:14px; font-weight:700; margin:0 0 8px }
+  .json-wrap { background:#1e2a35; color:#c9d1d9; border-radius:var(--radius); padding:16px; font-family:var(--mono); font-size:11px; line-height:1.6; overflow:auto; max-height:400px; white-space:pre }
+  .json-wrap .j-key { color:#79c0ff } .json-wrap .j-str { color:#a5d6ff } .json-wrap .j-num { color:#f2cc60 } .json-wrap .j-bool { color:#ff7b72 } .json-wrap .j-null { color:#8b949e }
+  details { margin-top:10px; font-size:12px; color:var(--ink-soft) }
+  summary { cursor:pointer; user-select:none }
+  .load-more { display:block; margin:12px auto 0; }
+  @media(max-width:640px) { .grid { grid-template-columns:1fr } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>Contact → Portal Documents Report</h1>
+    <p>Fetches all contacts for a firm, then maps each contact to the portal documents they can access. Runs in a local Python backend, so large firms won't crash the browser.</p>
+  </header>
+
+  <div class="panel">
+    <div class="grid">
+      <div>
+        <label>Server <span class="hint">(base URL)</span></label>
+        <input type="text" id="server" value="https://api-minas-tirith.anduin.dev" spellcheck="false">
+      </div>
+      <div>
+        <label>Firm ID <span class="hint">(required)</span></label>
+        <input type="text" id="firmId" value="fdfym4md5jlverjn" spellcheck="false">
+      </div>
+      <div>
+        <label>API Key <span class="hint">(Bearer token)</span></label>
+        <textarea id="apiKey" placeholder="paste API key — no 'Bearer ' prefix needed" spellcheck="false"></textarea>
+      </div>
+    </div>
+
+    <div style="margin-top:16px">
+      <label>Query mode</label>
+      <select id="mode" style="max-width:480px">
+        <option value="bulk">Bulk — fetch all documents once, then map locally (light on server)</option>
+        <option value="per-contact">Per-contact — one query per contact (exact, heavier)</option>
+      </select>
+      <p class="muted" id="modeHint" style="margin:6px 0 0"></p>
+    </div>
+
+    <div style="margin-top:14px" id="invMatrixWrap">
+      <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-weight:500">
+        <input type="checkbox" id="useInvMatrix" style="width:auto"> Use Investment matrix
+      </label>
+      <p class="muted" style="margin:6px 0 0">Resolves <b>Investments</b>-shared documents via the investment communication-matrix export. Only on firms that have it enabled.</p>
+
+      <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-weight:500;margin-top:12px">
+        <input type="checkbox" id="useInvViaIEFLE" style="width:auto"> Resolve Investments via IE × FLE matrix
+      </label>
+      <p class="muted" style="margin:6px 0 0">Maps each investment to its IE and fund legal entity (investments export), then resolves through the <b>IE × FLE × communication-type</b> matrix. Takes priority over the investment matrix.</p>
+    </div>
+
+    <div class="row">
+      <button class="btn-go" id="run">Generate report</button>
+      <button class="btn-ghost" id="btnDownloadJson" disabled>Download JSON</button>
+      <span class="muted">Credentials are sent only to your local backend, which calls the server above.</span>
+    </div>
+
+    <div class="status" id="status"></div>
+    <div class="progress-wrap" id="progressWrap"><div class="progress-bar" id="progressBar"></div></div>
+  </div>
+
+  <div id="results" hidden>
+    <div class="warn-banner" id="warnBanner" style="display:none"></div>
+    <div class="summary" id="summary"></div>
+    <div class="summary summary-targets" id="summaryTargets"></div>
+    <div class="summary summary-targets" id="summaryMatrices"></div>
+
+    <div class="toolbar">
+      <input type="text" id="search" placeholder="Search contacts or files…">
+      <select id="filterDocs">
+        <option value="all">All contacts</option>
+        <option value="with">Has documents</option>
+        <option value="without">No documents</option>
+      </select>
+    </div>
+
+    <div class="cards" id="cards"></div>
+    <button class="btn-ghost load-more" id="loadMore" style="display:none">Show more contacts</button>
+
+    <div class="json-section" id="jsonSection">
+      <div style="display:flex;align-items:center;gap:12px;margin-bottom:8px">
+        <h2 style="margin:0">JSON Report</h2>
+        <button class="btn-ghost" style="font-size:12px;padding:5px 12px" id="btnCopyJson">Copy JSON</button>
+        <span class="muted" id="jsonNote"></span>
+      </div>
+      <div class="json-wrap" id="jsonWrap"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+const $ = id => document.getElementById(id);
+const esc = s => String(s==null?"":s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+
+function setStatus(msg, err=false){ const s=$("status"); s.textContent=msg; s.className="status"+(err?" err":""); }
+function showProgress(on, indet=true){ $("progressWrap").style.display=on?"block":"none"; $("progressBar").classList.toggle("indet", on&&indet); if(!on) $("progressBar").style.width="0%"; }
+
+async function copyText(text){
+  try { if(navigator.clipboard && window.isSecureContext){ await navigator.clipboard.writeText(text); return true; } } catch {}
+  try { const ta=document.createElement("textarea"); ta.value=text; ta.style.position="fixed"; ta.style.top="-1000px"; document.body.appendChild(ta); ta.focus(); ta.select(); const ok=document.execCommand("copy"); document.body.removeChild(ta); return ok; } catch { return false; }
+}
+async function copyFromBtn(btn){
+  const ok=await copyText(btn.getAttribute("data-copy")||""); const o=btn.textContent;
+  btn.textContent=ok?"copied!":"failed"; btn.classList.toggle("copied",ok);
+  setTimeout(()=>{btn.textContent=o; btn.classList.remove("copied");},1200);
+}
+function fmtDate(iso){ if(!iso) return "—"; try{ const d=new Date(iso); return d.toLocaleDateString(undefined,{year:"numeric",month:"short",day:"numeric"}); }catch{ return iso; } }
+function initials(f,l){ return ((f||"")[0]||"")+((l||"")[0]||""); }
+
+const TARGET_LABELS = {
+  AllContacts:{text:"All contacts",cls:"tt-all"},
+  Contacts:{text:"Contacts",cls:"tt-contacts"},
+  InvestmentEntities:{text:"Entities",cls:"tt-ie"},
+  InvestmentEntitiesInFundLegalEntity:{text:"Entity × fund",cls:"tt-iefle"},
+  Investments:{text:"Investments",cls:"tt-inv"},
+};
+function targetTypeLabel(t){ if(!t) return '<span style="color:var(--absent)">—</span>'; const m=TARGET_LABELS[t]||{text:t,cls:"tt-other"}; return `<span class="tt ${m.cls}" title="${esc(t)}">${esc(m.text)}</span>`; }
+function relatedFundsLabel(funds){
+  if(!funds||!funds.length) return '<span style="color:var(--absent)">—</span>';
+  return funds.map(f=>{ const shortId=String(f.id).split(".").slice(1).join(".")||f.id; const text=f.name||shortId; return `<span class="fund-tag" title="${esc(f.id)}${f.name?"":" (name not found)"}">${esc(text)}</span>`; }).join(" ");
+}
+function highlightJson(json){
+  return json.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;")
+    .replace(/("(\\u[a-fA-F0-9]{4}|\\[^u]|[^\\"])*"(\s*:)?|\b(true|false|null)\b|-?\d+(?:\.\d*)?(?:[eE][+\-]?\d+)?)/g, m=>{
+      let cls="j-num"; if(/^"/.test(m)) cls=/:$/.test(m)?"j-key":"j-str"; else if(/true|false/.test(m)) cls="j-bool"; else if(/null/.test(m)) cls="j-null"; return `<span class="${cls}">${m}</span>`;
+    });
+}
+
+const MODE_HINTS = {
+  bulk:"Fetches the full document list once, then resolves sharing locally via the matrix exports. Far fewer server calls.",
+  "per-contact":"One document query per contact (throttled). Exact for every sharing type, but heavier on the server. Matrix exports aren't needed.",
+};
+function updateModeHint(){ const m=$("mode").value; $("modeHint").textContent=MODE_HINTS[m]; $("invMatrixWrap").style.display=m==="bulk"?"block":"none"; }
+
+let reportData = null;
+let filteredRows = [];
+const PAGE = 100;     // render contacts in pages to keep the DOM light
+let shown = 0;
+
+/* ── run via backend ── */
+async function run(){
+  const payload = {
+    server: $("server").value.trim(),
+    firmId: $("firmId").value.trim(),
+    apiKey: $("apiKey").value.trim(),
+    mode: $("mode").value,
+    useInvestmentMatrix: $("useInvMatrix").checked,
+    useInvestmentsViaIEFLE: $("useInvViaIEFLE").checked,
+  };
+  if(!payload.server || !payload.firmId || !payload.apiKey){ setStatus("Server, Firm ID, and API key are all required.", true); return; }
+
+  $("run").disabled = true; $("btnDownloadJson").disabled = true;
+  $("results").hidden = true; reportData = null;
+  setStatus("Starting…"); showProgress(true);
+
+  let jobId;
+  try {
+    const res = await fetch("/api/generate", { method:"POST", headers:{"content-type":"application/json"}, body:JSON.stringify(payload) });
+    const data = await res.json();
+    if(!res.ok){ throw new Error(data.error || ("HTTP "+res.status)); }
+    jobId = data.jobId;
+  } catch(e){ showProgress(false); setStatus("Could not reach the local backend: "+e.message, true); $("run").disabled=false; return; }
+
+  // poll
+  const poll = async () => {
+    let data;
+    try { const r = await fetch("/api/status/"+jobId); data = await r.json(); }
+    catch(e){ setStatus("Lost connection to backend: "+e.message, true); showProgress(false); $("run").disabled=false; return; }
+
+    if(data.status === "running"){ setStatus(data.progress || "Working…"); setTimeout(poll, 1000); return; }
+    if(data.status === "error"){ showProgress(false); setStatus("Error: "+(data.error||"unknown"), true); $("run").disabled=false; return; }
+    if(data.status === "done"){
+      reportData = data.report;
+      fetch("/api/done/"+jobId, {method:"POST"}).catch(()=>{});
+      showProgress(false);
+      const m = reportData.meta;
+      setStatus(`Done — ${m.totalContacts} contacts, ${m.totalUniqueDocuments} unique file(s) (${m.apiRequestCount} API calls).`);
+      renderReport(reportData);
+      $("run").disabled=false; $("btnDownloadJson").disabled=false;
+    }
+  };
+  poll();
+}
+
+/* ── render ── */
+function renderReport(report){
+  const m = report.meta;
+
+  const wb=$("warnBanner");
+  if(m.partiallyResolvedDocuments){
+    const details=m.partiallyResolvedDetails||[];
+    const invDisabled=details.filter(d=>d.targetType==="Investments" && /enable --use-investment-matrix|investments export or communication matrix/.test(d.reason||""));
+    let html=`<b>${m.partiallyResolvedDocuments} document(s)</b> could not be fully mapped to contacts. `;
+    if(invDisabled.length) html+=`<br><b>${invDisabled.length}</b> are shared by <b>Investments</b> but no matrix resolved them — enable an investment option and re-run.`;
+    else html+=`See <code>meta.partiallyResolvedDetails</code> in the JSON for the reason on each.`;
+    wb.style.display="block"; wb.innerHTML=html;
+  } else wb.style.display="none";
+
+  $("summary").innerHTML = [
+    {n:m.totalContacts,label:"Contacts",tip:"Total number of contacts in the firm."},
+    {n:m.contactsWithDocuments,label:"With docs",tip:"Contacts who can access at least one document."},
+    {n:m.contactsWithoutDocuments,label:"Without docs",tip:"Contacts who can't access any document."},
+    {n:m.totalDocuments,label:"Documents",tip:"Total portal documents returned by the list-portal-documents API (each counted once)."},
+  ].map(c=>`<div class="chip" data-tip="${esc(c.tip)}"><b>${c.n}</b><span>${esc(c.label)}</span></div>`).join("");
+
+  const tc=m.documentsByTargetType;
+  if(tc){
+    const chips=[
+      {key:"Contacts",label:"By contact",tip:"Documents shared with target type ‘Contacts’."},
+      {key:"InvestmentEntitiesInFundLegalEntity",label:"By entity × fund",tip:"Documents shared with target type ‘InvestmentEntitiesInFundLegalEntity’."},
+      {key:"Investments",label:"By investment",tip:"Documents shared with target type ‘Investments’."},
+      {key:"InvestmentEntities",label:"By entity",tip:"Documents shared with target type ‘InvestmentEntities’."},
+      {key:"AllContacts",label:"All contacts",tip:"Documents shared with target type ‘AllContacts’."},
+    ];
+    if(tc.Other) chips.push({key:"Other",label:"Other",tip:"Documents with an unrecognized or missing sharing target type."});
+    $("summaryTargets").innerHTML = `<span class="group-label">By target type</span>`+chips.map(c=>`<div class="chip-sm" data-tip="${esc(c.tip)}"><b>${tc[c.key]||0}</b><span>${esc(c.label)}</span></div>`).join("");
+    $("summaryTargets").style.display="flex";
+  } else $("summaryTargets").style.display="none";
+
+  const mx=m.matrices;
+  if(mx){
+    const chips=[];
+    chips.push(mx.ieFleTargetsPresent
+      ? {n:mx.communicationMatrixRows??0,label:"IE×FLE×Type",tip:"Rows in the communication-matrices export (one contact × IE × FLE, with its yes/no communication-type map)."}
+      : {n:"—",label:"IE×FLE×Type",tip:"Not fetched — no documents use the InvestmentEntitiesInFundLegalEntity target."});
+    if(mx.investmentsViaIEFLE && mx.investmentTargetsPresent)
+      chips.push({n:mx.investmentRecords??0,label:"Investments",tip:"Rows in the investments export, used to map each investment to its IE and fund legal entity."});
+    else if(mx.investmentTargetsPresent && mx.investmentMatrixUsed)
+      chips.push({n:mx.investmentMatrixRows??0,label:"Inv×Type",tip:"Rows in the investment-communication-matrices export (one contact × investment, with its yes/no communication-type map)."});
+    else
+      chips.push({n:"—",label:"Inv×Type",tip:"Not fetched — no investment matrix was used (and/or no Investments-shared documents)."});
+    $("summaryMatrices").innerHTML = `<span class="group-label">Matrix records</span>`+chips.map(c=>`<div class="chip-sm" data-tip="${esc(c.tip)}"><b>${c.n}</b><span>${esc(c.label)}</span></div>`).join("");
+    $("summaryMatrices").style.display="flex";
+  } else $("summaryMatrices").style.display="none";
+
+  applyFilter();
+
+  // JSON preview can be huge — cap it for display, full data still downloads.
+  const full = JSON.stringify(report, null, 2);
+  const big = full.length > 400000;
+  $("jsonWrap").innerHTML = highlightJson(big ? full.slice(0,400000) : full);
+  $("jsonNote").textContent = big ? "(preview truncated — use Download JSON for the full report)" : "";
+
+  $("results").hidden = false;
+}
+
+function applyFilter(){
+  if(!reportData) return;
+  const search=$("search").value.trim().toLowerCase();
+  const filter=$("filterDocs").value;
+  let rows=reportData.contactDocuments;
+  if(filter==="with") rows=rows.filter(r=>r.documentCount>0);
+  if(filter==="without") rows=rows.filter(r=>r.documentCount===0);
+  if(search) rows=rows.filter(r=>{
+    const c=r.contact;
+    return `${c.firstName||""} ${c.lastName||""}`.toLowerCase().includes(search)
+      || (c.email||"").toLowerCase().includes(search) || (c.id||"").toLowerCase().includes(search)
+      || r.documents.some(d=>(d.name||"").toLowerCase().includes(search)||(d.id||"").toLowerCase().includes(search));
+  });
+  filteredRows=rows; shown=0; $("cards").innerHTML="";
+  renderMore();
+}
+
+function renderMore(){
+  const slice=filteredRows.slice(shown, shown+PAGE);
+  const frag=document.createElement("div");
+  frag.innerHTML = slice.map((r,k)=>cardShell(r, shown+k)).join("") ||
+    (shown===0 ? `<div style="color:var(--ink-soft);padding:16px 0">No contacts match the current filter.</div>` : "");
+  while(frag.firstChild) $("cards").appendChild(frag.firstChild);
+  shown+=slice.length;
+  $("loadMore").style.display = shown<filteredRows.length ? "block" : "none";
+  $("loadMore").textContent = `Show more contacts (${filteredRows.length-shown} remaining)`;
+}
+
+function cardShell(r, idx){
+  const c=r.contact;
+  const ini=esc((initials(c.firstName,c.lastName).toUpperCase())||"?");
+  const name=esc(`${c.firstName||""} ${c.lastName||""}`.trim()||c.id);
+  const badgeCls=r.documentCount>0?"":" zero";
+  return `
+    <div class="card" data-idx="${idx}">
+      <div class="card-head" onclick="toggleCard(this)">
+        <div class="card-avatar">${ini}</div>
+        <div>
+          <div class="card-name">${name}</div>
+          <div class="card-email">${esc(c.email||"")}${c.company?' <span style="color:var(--ink-soft)">· '+esc(c.company)+'</span>':""}</div>
+        </div>
+        <div class="card-meta"><span class="badge${badgeCls}">${r.documentCount}</span><span class="chevron">▾</span></div>
+      </div>
+      <div class="card-body"></div>
+    </div>`;
+}
+
+function filesTable(r){
+  if(r.documentCount===0) return `<div class="no-files">No portal documents shared with this contact.</div>`;
+  return `<table class="file-table"><thead><tr>
+    <th>File Name</th><th>Shared With</th><th>Related Funds</th><th>Shared At</th><th>Effective Date</th><th>File ID</th>
+  </tr></thead><tbody>${r.documents.map(d=>`
+    <tr>
+      <td class="file-name">${esc(d.name||"—")}</td>
+      <td>${targetTypeLabel(d.sharedWithType)}</td>
+      <td>${relatedFundsLabel(d.relatedFunds)}</td>
+      <td class="file-date">${fmtDate(d.sharedAt)}</td>
+      <td class="file-date">${d.effectiveDate||"—"}</td>
+      <td class="file-id">${esc(d.id||"—")}<button class="copy-btn" data-copy="${esc(d.id||"")}" onclick="event.stopPropagation();copyFromBtn(this)">copy</button></td>
+    </tr>`).join("")}</tbody></table>`;
+}
+
+// Lazy: build the document table only when a card is first expanded.
+function toggleCard(head){
+  const card=head.parentElement;
+  const body=card.querySelector(".card-body");
+  const chev=card.querySelector(".chevron");
+  const open=body.classList.toggle("open");
+  chev.classList.toggle("open", open);
+  if(open && !body.dataset.built){
+    const idx=parseInt(card.getAttribute("data-idx"),10);
+    body.innerHTML=filesTable(filteredRows[idx]);
+    body.dataset.built="1";
+  }
+}
+
+function downloadJson(){
+  if(!reportData) return;
+  const blob=new Blob([JSON.stringify(reportData,null,2)],{type:"application/json"});
+  const url=URL.createObjectURL(blob); const a=document.createElement("a");
+  a.href=url; a.download=`portal-doc-report-${reportData.meta.firmId}-${new Date().toISOString().slice(0,10)}.json`; a.click();
+  URL.revokeObjectURL(url);
+}
+
+$("run").onclick=run;
+$("btnDownloadJson").onclick=downloadJson;
+$("btnCopyJson").onclick=async()=>{ if(!reportData) return; const ok=await copyText(JSON.stringify(reportData,null,2)); const b=$("btnCopyJson"); const o=b.textContent; b.textContent=ok?"Copied!":"Copy failed"; setTimeout(()=>b.textContent=o,1200); };
+$("search").oninput=()=>{ if(reportData) applyFilter(); };
+$("filterDocs").onchange=()=>{ if(reportData) applyFilter(); };
+$("loadMore").onclick=renderMore;
+$("mode").onchange=updateModeHint;
+updateModeHint();
+</script>
+</body>
+</html>
