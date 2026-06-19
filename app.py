@@ -34,6 +34,12 @@ def index():
     return render_template("index.html")
 
 
+@app.route("/compare")
+def compare():
+    # Client-side comparison of two downloaded report JSON files.
+    return render_template("compare.html")
+
+
 @app.route("/api/generate", methods=["POST"])
 def generate():
     data = request.get_json(force=True) or {}
