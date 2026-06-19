@@ -138,7 +138,7 @@
       </div>
     </div>
 
-    <div style="margin-top:16px">
+    <div style="margin-top:16px;display:none">
       <label>Query mode</label>
       <select id="mode" style="max-width:480px">
         <option value="bulk">Bulk — fetch all documents once, then map locally (light on server)</option>
@@ -162,6 +162,7 @@
     <div class="row">
       <button class="btn-go" id="run">Generate report</button>
       <button class="btn-ghost" id="btnDownloadJson" disabled>Download JSON</button>
+      <button class="btn-ghost" id="btnDownloadCsv" disabled>Download CSV</button>
       <span class="muted">Credentials are sent only to your local backend, which calls the server above.</span>
     </div>
 
@@ -259,7 +260,7 @@ async function run(){
   };
   if(!payload.server || !payload.firmId || !payload.apiKey){ setStatus("Server, Firm ID, and API key are all required.", true); return; }
 
-  $("run").disabled = true; $("btnDownloadJson").disabled = true;
+  $("run").disabled = true; $("btnDownloadJson").disabled = true; $("btnDownloadCsv").disabled = true;
   $("results").hidden = true; reportData = null;
   setStatus("Starting…"); showProgress(true);
 
@@ -284,9 +285,9 @@ async function run(){
       fetch("/api/done/"+jobId, {method:"POST"}).catch(()=>{});
       showProgress(false);
       const m = reportData.meta;
-      setStatus(`Done — ${m.totalContacts} contacts, ${m.totalUniqueDocuments} unique file(s) (${m.apiRequestCount} API calls).`);
+      setStatus(`Done — ${m.apiRequestCount} API call${m.apiRequestCount===1?"":"s"}.`);
       renderReport(reportData);
-      $("run").disabled=false; $("btnDownloadJson").disabled=false;
+      $("run").disabled=false; $("btnDownloadJson").disabled=false; $("btnDownloadCsv").disabled=false;
     }
   };
   poll();
@@ -297,14 +298,22 @@ function renderReport(report){
   const m = report.meta;
 
   const wb=$("warnBanner");
+  const warnings=[];
   if(m.partiallyResolvedDocuments){
     const details=m.partiallyResolvedDetails||[];
     const invDisabled=details.filter(d=>d.targetType==="Investments" && /enable --use-investment-matrix|investments export or communication matrix/.test(d.reason||""));
     let html=`<b>${m.partiallyResolvedDocuments} document(s)</b> could not be fully mapped to contacts. `;
     if(invDisabled.length) html+=`<br><b>${invDisabled.length}</b> are shared by <b>Investments</b> but no matrix resolved them — enable an investment option and re-run.`;
     else html+=`See <code>meta.partiallyResolvedDetails</code> in the JSON for the reason on each.`;
-    wb.style.display="block"; wb.innerHTML=html;
-  } else wb.style.display="none";
+    warnings.push(html);
+  }
+  if(m.documentsByTargetType){
+    const targetSum=Object.values(m.documentsByTargetType).reduce((a,b)=>a+(Number(b)||0),0);
+    if(targetSum!==m.totalDocuments)
+      warnings.push(`<b>Target-type totals don't add up.</b> Documents by target type sum to <b>${targetSum}</b>, but the portal-documents API returned <b>${m.totalDocuments}</b>.`);
+  }
+  if(warnings.length){ wb.style.display="block"; wb.innerHTML=warnings.join("<hr style=\"border:0;border-top:1px solid #f0d9a8;margin:8px 0\">"); }
+  else wb.style.display="none";
 
   $("summary").innerHTML = [
     {n:m.totalContacts,label:"Contacts",tip:"Total number of contacts in the firm."},
@@ -430,16 +439,56 @@ function toggleCard(head){
   }
 }
 
+function triggerDownload(blob, filename){
+  const url=URL.createObjectURL(blob); const a=document.createElement("a");
+  a.href=url; a.download=filename; a.click();
+  URL.revokeObjectURL(url);
+}
+function reportFileBase(){
+  return `portal-doc-report-${reportData.meta.firmId}-${new Date().toISOString().slice(0,10)}`;
+}
+
 function downloadJson(){
   if(!reportData) return;
   const blob=new Blob([JSON.stringify(reportData,null,2)],{type:"application/json"});
-  const url=URL.createObjectURL(blob); const a=document.createElement("a");
-  a.href=url; a.download=`portal-doc-report-${reportData.meta.firmId}-${new Date().toISOString().slice(0,10)}.json`; a.click();
-  URL.revokeObjectURL(url);
+  triggerDownload(blob, `${reportFileBase()}.json`);
+}
+
+function csvCell(v){
+  const s = v==null ? "" : String(v);
+  return /[",\n\r]/.test(s) ? '"'+s.replace(/"/g,'""')+'"' : s;
+}
+function fundsCell(funds){
+  if(!funds||!funds.length) return "";
+  return funds.map(f=>{ const shortId=String(f.id).split(".").slice(1).join(".")||f.id; return f.name||shortId; }).join("; ");
+}
+function buildCsv(report){
+  const headers=["Contact First Name","Contact Last Name","Contact Email","Contact Company","Contact Title","Contact ID",
+                 "Document Name","Shared With Type","Related Funds","Shared At","Effective Date","Document ID"];
+  const lines=[headers.map(csvCell).join(",")];
+  for(const r of report.contactDocuments){
+    const c=r.contact;
+    const base=[c.firstName,c.lastName,c.email,c.company,c.title,c.id];
+    if(!r.documents.length){
+      lines.push([...base,"","","","","",""].map(csvCell).join(","));
+    } else {
+      for(const d of r.documents){
+        lines.push([...base, d.name, d.sharedWithType, fundsCell(d.relatedFunds), d.sharedAt, d.effectiveDate, d.id].map(csvCell).join(","));
+      }
+    }
+  }
+  return lines.join("\r\n");
+}
+function downloadCsv(){
+  if(!reportData) return;
+  // BOM so Excel reads UTF-8 correctly
+  const blob=new Blob(["﻿"+buildCsv(reportData)],{type:"text/csv;charset=utf-8"});
+  triggerDownload(blob, `${reportFileBase()}.csv`);
 }
 
 $("run").onclick=run;
 $("btnDownloadJson").onclick=downloadJson;
+$("btnDownloadCsv").onclick=downloadCsv;
 $("btnCopyJson").onclick=async()=>{ if(!reportData) return; const ok=await copyText(JSON.stringify(reportData,null,2)); const b=$("btnCopyJson"); const o=b.textContent; b.textContent=ok?"Copied!":"Copy failed"; setTimeout(()=>b.textContent=o,1200); };
 $("search").oninput=()=>{ if(reportData) applyFilter(); };
 $("filterDocs").onchange=()=>{ if(reportData) applyFilter(); };
