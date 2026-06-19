@@ -1,0 +1,470 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Compare Portal Document Reports</title>
+<style>
+  :root {
+    --ink:#15212b; --ink-soft:#5a6b78; --line:#dfe5ea; --bg:#f5f7f9; --panel:#ffffff;
+    --accent:#1f6feb; --ok:#127a3e; --ok-bg:#e7f4ec; --bad:#b42318; --bad-bg:#fdeceb;
+    --warn:#9a6700; --warn-bg:#fdf3e2; --absent:#9aa7b1;
+    --add:#127a3e; --add-bg:#e7f4ec; --rem:#b42318; --rem-bg:#fdeceb; --chg:#9a6700; --chg-bg:#fdf3e2;
+    --mono:"SF Mono",ui-monospace,"Cascadia Code",Menlo,Consolas,monospace;
+    --sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    --radius:10px;
+  }
+  *, *::before, *::after { box-sizing: border-box }
+  body { margin:0; background:var(--bg); color:var(--ink); font-family:var(--sans); font-size:14px; line-height:1.5 }
+  .wrap { max-width:1200px; margin:0 auto; padding:28px 22px 80px }
+  header h1 { font-size:20px; margin:0 0 2px; letter-spacing:-.01em }
+  header p  { margin:0 0 20px; color:var(--ink-soft) }
+  .nav { margin:0 0 18px; font-size:13px }
+  .nav a { color:var(--accent); text-decoration:none; font-weight:600 }
+  .nav a:hover { text-decoration:underline }
+  .panel { background:var(--panel); border:1px solid var(--line); border-radius:var(--radius); padding:18px }
+  .grid2 { display:grid; grid-template-columns:1fr 1fr; gap:16px }
+  label { display:block; font-weight:600; font-size:12px; margin:0 0 5px; color:var(--ink) }
+  label .hint { font-weight:400; color:var(--ink-soft) }
+  .drop {
+    border:1.5px dashed var(--line); border-radius:8px; padding:18px 16px; text-align:center;
+    cursor:pointer; transition:border-color .15s, background .15s; background:#fff;
+  }
+  .drop:hover, .drop.drag { border-color:var(--accent); background:#f7faff }
+  .drop.loaded { border-style:solid; border-color:var(--ok); background:var(--ok-bg) }
+  .drop .dz-title { font-weight:600; font-size:13px }
+  .drop .dz-sub { font-size:11px; color:var(--ink-soft); margin-top:3px; word-break:break-all }
+  .drop input[type=file] { display:none }
+  button { font-family:var(--sans); font-size:14px; font-weight:600; border:0; border-radius:7px; padding:10px 18px; cursor:pointer; transition:opacity .15s }
+  .btn-go    { background:var(--accent); color:#fff }
+  .btn-go:hover:not(:disabled) { background:#1558c0 }
+  .btn-ghost { background:#fff; border:1px solid var(--line); color:var(--ink); font-weight:500 }
+  .btn-ghost:hover:not(:disabled) { background:var(--bg) }
+  button:disabled { opacity:.45; cursor:not-allowed }
+  .row { display:flex; gap:10px; align-items:center; margin-top:16px; flex-wrap:wrap }
+  .muted { color:var(--ink-soft); font-size:12px }
+  .status { margin:14px 0 0; color:var(--ink-soft); font-size:13px; min-height:18px }
+  .status.err { color:var(--bad) }
+
+  .section-title { font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.06em; color:var(--ink-soft); margin:26px 0 10px }
+  .summary { display:flex; gap:10px; flex-wrap:wrap; margin:10px 0 }
+  .chip { background:#fff; border:1px solid var(--line); border-radius:8px; padding:9px 14px; min-width:84px; position:relative }
+  .chip b { display:block; font-size:22px; line-height:1.1 }
+  .chip span { font-size:11px; color:var(--ink-soft) }
+  .chip.add b { color:var(--add) } .chip.rem b { color:var(--rem) } .chip.chg b { color:var(--chg) }
+
+  /* meta diff table */
+  .meta-table { width:100%; border-collapse:collapse; font-size:13px; background:#fff; border:1px solid var(--line); border-radius:var(--radius); overflow:hidden }
+  .meta-table th { background:#fafbfc; font-size:10px; text-transform:uppercase; letter-spacing:.04em; color:var(--ink-soft); padding:9px 14px; text-align:left; border-bottom:1px solid var(--line) }
+  .meta-table td { padding:8px 14px; border-bottom:1px solid var(--line); vertical-align:top }
+  .meta-table tr:last-child td { border-bottom:0 }
+  .meta-table .k { font-weight:600; width:34% }
+  .meta-table .v { font-family:var(--mono); font-size:11.5px; width:30%; word-break:break-word }
+  .meta-table tr.diff { background:var(--chg-bg) }
+  .meta-table tr.diff .v { color:var(--ink) }
+  .meta-table .dot { display:inline-block; width:14px; text-align:center; font-weight:700 }
+  .dot.same { color:var(--absent) } .dot.diff { color:var(--chg) }
+
+  .toolbar { display:flex; gap:12px; align-items:center; margin:0 0 10px; flex-wrap:wrap }
+  .toolbar input[type=text] { width:240px; font-size:12px; padding:7px 10px; border:1px solid var(--line); border-radius:7px; font-family:var(--mono) }
+  .toolbar select { width:auto; font-family:var(--sans); font-size:12px; padding:7px 10px; border:1px solid var(--line); border-radius:7px; background:#fff }
+
+  .cards { display:flex; flex-direction:column; gap:10px }
+  .card { background:#fff; border:1px solid var(--line); border-radius:var(--radius); overflow:hidden }
+  .card.only-a { border-left:3px solid var(--rem) }
+  .card.only-b { border-left:3px solid var(--add) }
+  .card.changed { border-left:3px solid var(--chg) }
+  .card.same { border-left:3px solid var(--line) }
+  .card-head { display:flex; align-items:center; gap:12px; padding:12px 16px; cursor:pointer; user-select:none }
+  .card-head:hover { background:#f7f9fb }
+  .card-avatar { width:34px; height:34px; border-radius:50%; background:var(--accent); color:#fff; font-weight:700; font-size:13px; display:flex; align-items:center; justify-content:center; flex-shrink:0 }
+  .card-name  { font-weight:600; font-size:14px }
+  .card-email { font-size:12px; color:var(--ink-soft) }
+  .card-meta  { margin-left:auto; display:flex; align-items:center; gap:6px }
+  .pill { display:inline-flex; align-items:center; gap:3px; border-radius:20px; font-size:11px; font-weight:700; padding:2px 9px }
+  .pill.add { background:var(--add-bg); color:var(--add) }
+  .pill.rem { background:var(--rem-bg); color:var(--rem) }
+  .pill.chg { background:var(--chg-bg); color:var(--chg) }
+  .pill.same { background:var(--line); color:var(--ink-soft) }
+  .tag { display:inline-flex; align-items:center; border-radius:20px; font-size:10px; font-weight:700; padding:2px 9px; text-transform:uppercase; letter-spacing:.03em }
+  .tag.only-a { background:var(--rem-bg); color:var(--rem) }
+  .tag.only-b { background:var(--add-bg); color:var(--add) }
+  .tag.changed { background:var(--chg-bg); color:var(--chg) }
+  .tag.same { background:var(--line); color:var(--ink-soft) }
+  .chevron { color:var(--ink-soft); font-size:11px; transition:transform .2s }
+  .chevron.open { transform:rotate(180deg) }
+  .card-body { display:none; border-top:1px solid var(--line) }
+  .card-body.open { display:block }
+
+  .file-table { width:100%; border-collapse:collapse; font-size:12px }
+  .file-table th { background:#fafbfc; font-size:10px; text-transform:uppercase; letter-spacing:.04em; color:var(--ink-soft); padding:7px 14px; text-align:left; border-bottom:1px solid var(--line) }
+  .file-table td { padding:8px 14px; border-bottom:1px solid var(--line); vertical-align:top }
+  .file-table tr:last-child td { border-bottom:0 }
+  .file-name { font-weight:500 }
+  .file-id   { font-family:var(--mono); font-size:10px; color:var(--ink-soft) }
+  .st { display:inline-block; font-size:10px; font-weight:700; padding:2px 8px; border-radius:20px; white-space:nowrap; text-transform:uppercase; letter-spacing:.03em }
+  .st.add { background:var(--add-bg); color:var(--add) }
+  .st.rem { background:var(--rem-bg); color:var(--rem) }
+  .st.chg { background:var(--chg-bg); color:var(--chg) }
+  .st.same { background:var(--line); color:var(--ink-soft) }
+  .delta { font-size:11px }
+  .delta .from { color:var(--rem); text-decoration:line-through }
+  .delta .to { color:var(--add) }
+  .delta .fld { font-weight:600; color:var(--ink-soft) }
+  .no-files { padding:14px; color:var(--ink-soft); font-size:12px; font-style:italic }
+  .load-more { display:block; margin:12px auto 0 }
+  @media(max-width:640px){ .grid2 { grid-template-columns:1fr } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>Compare Portal Document Reports</h1>
+    <p>Upload two report JSON files (from the report page's <b>Download JSON</b>) to compare their metadata and the documents shared with each contact. Contacts are matched by email. Everything runs in your browser — nothing is uploaded.</p>
+    <div class="nav"><a href="/">← Back to report generator</a></div>
+  </header>
+
+  <div class="panel">
+    <div class="grid2">
+      <div>
+        <label>File A <span class="hint">(baseline / older)</span></label>
+        <label class="drop" id="dropA" for="fileA">
+          <div class="dz-title" id="titleA">Click or drop a report JSON</div>
+          <div class="dz-sub" id="subA">No file selected</div>
+          <input type="file" id="fileA" accept=".json,application/json">
+        </label>
+      </div>
+      <div>
+        <label>File B <span class="hint">(comparison / newer)</span></label>
+        <label class="drop" id="dropB" for="fileB">
+          <div class="dz-title" id="titleB">Click or drop a report JSON</div>
+          <div class="dz-sub" id="subB">No file selected</div>
+          <input type="file" id="fileB" accept=".json,application/json">
+        </label>
+      </div>
+    </div>
+    <div class="row">
+      <button class="btn-go" id="run" disabled>Compare</button>
+      <button class="btn-ghost" id="swap" disabled>Swap A ⇄ B</button>
+      <span class="muted">A is treated as the baseline; B as the newer report.</span>
+    </div>
+    <div class="status" id="status"></div>
+  </div>
+
+  <div id="results" hidden>
+    <div class="section-title">Metadata</div>
+    <div id="metaWrap"></div>
+
+    <div class="section-title">Documents shared by contact <span style="font-weight:400;text-transform:none;letter-spacing:0">(matched by email)</span></div>
+    <div class="summary" id="contactSummary"></div>
+
+    <div class="toolbar">
+      <input type="text" id="search" placeholder="Search by email, name, or document…">
+      <select id="filterKind">
+        <option value="changed">Changed contacts (default)</option>
+        <option value="all">All contacts</option>
+        <option value="only-a">Only in A (removed)</option>
+        <option value="only-b">Only in B (added)</option>
+        <option value="diff-docs">Document changes only</option>
+        <option value="same">Identical contacts</option>
+      </select>
+    </div>
+    <div class="cards" id="cards"></div>
+    <button class="btn-ghost load-more" id="loadMore" style="display:none">Show more</button>
+  </div>
+</div>
+
+<script>
+const $ = id => document.getElementById(id);
+const esc = s => String(s==null?"":s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+function setStatus(msg, err=false){ const s=$("status"); s.textContent=msg; s.className="status"+(err?" err":""); }
+function initials(f,l){ return (((f||"")[0]||"")+((l||"")[0]||"")).toUpperCase()||"?"; }
+function fundsStr(funds){ if(!funds||!funds.length) return ""; return funds.map(f=>String(f.id)).sort().join(","); }
+function fundsLabel(funds){ if(!funds||!funds.length) return "—"; return funds.map(f=>{ const s=String(f.id).split(".").slice(1).join(".")||f.id; return f.name||s; }).join("; "); }
+
+/* ── file loading ── */
+const files = { A:null, B:null };   // parsed report objects
+function validReport(o){ return o && typeof o==="object" && o.meta && Array.isArray(o.contactDocuments); }
+
+function wireDrop(slot){
+  const input=$("file"+slot), drop=$("drop"+slot);
+  const handle = file => {
+    if(!file) return;
+    const reader=new FileReader();
+    reader.onload = () => {
+      try {
+        const obj=JSON.parse(reader.result);
+        if(!validReport(obj)) throw new Error("not a portal-document report (missing meta / contactDocuments)");
+        files[slot]=obj;
+        drop.classList.add("loaded");
+        $("title"+slot).textContent="✓ "+file.name;
+        const m=obj.meta;
+        $("sub"+slot).textContent=`${m.totalContacts??"?"} contacts · ${m.totalDocuments??"?"} docs · ${(m.generatedAt||"").slice(0,19).replace("T"," ")||"no date"}`;
+      } catch(e){
+        files[slot]=null; drop.classList.remove("loaded");
+        $("title"+slot).textContent="✗ Could not read file";
+        $("sub"+slot).textContent=e.message;
+      }
+      refreshButtons();
+    };
+    reader.onerror=()=>{ files[slot]=null; drop.classList.remove("loaded"); $("sub"+slot).textContent="Failed to read file"; refreshButtons(); };
+    reader.readAsText(file);
+  };
+  input.onchange=()=>handle(input.files[0]);
+  ["dragenter","dragover"].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.add("drag");}));
+  ["dragleave","drop"].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.remove("drag");}));
+  drop.addEventListener("drop",e=>{ if(e.dataTransfer.files.length) handle(e.dataTransfer.files[0]); });
+}
+function refreshButtons(){ const ready=!!(files.A&&files.B); $("run").disabled=!ready; $("swap").disabled=!ready; }
+wireDrop("A"); wireDrop("B");
+
+$("swap").onclick=()=>{
+  const tmp=files.A; files.A=files.B; files.B=tmp;
+  for(const slot of ["A","B"]){
+    const o=files[slot], drop=$("drop"+slot);
+    if(o){ drop.classList.add("loaded"); $("title"+slot).textContent="✓ (report)"; const m=o.meta;
+      $("sub"+slot).textContent=`${m.totalContacts??"?"} contacts · ${m.totalDocuments??"?"} docs · ${(m.generatedAt||"").slice(0,19).replace("T"," ")||"no date"}`; }
+  }
+  if($("results").hidden===false) compare();
+};
+
+/* ── metadata comparison ── */
+// Flatten meta to ordered [label, value] scalars, expanding one level of objects.
+function flattenMeta(meta){
+  const out=[];
+  const SKIP=new Set(["partiallyResolvedNote","partiallyResolvedDetails"]);
+  for(const [k,v] of Object.entries(meta||{})){
+    if(SKIP.has(k)) continue;
+    if(v && typeof v==="object" && !Array.isArray(v)){
+      for(const [k2,v2] of Object.entries(v)) out.push([`${k}.${k2}`, v2]);
+    } else if(Array.isArray(v)){
+      out.push([k, `[${v.length} item${v.length===1?"":"s"}]`]);
+    } else {
+      out.push([k, v]);
+    }
+  }
+  return out;
+}
+function renderMeta(a,b){
+  const ma=Object.fromEntries(flattenMeta(a.meta)), mb=Object.fromEntries(flattenMeta(b.meta));
+  const keys=[...new Set([...Object.keys(ma),...Object.keys(mb)])];
+  const fmt=v=>v===undefined?'<span style="color:var(--absent)">—</span>':esc(typeof v==="object"?JSON.stringify(v):v);
+  let diffCount=0;
+  const rows=keys.map(k=>{
+    const va=ma[k], vb=mb[k];
+    const same=JSON.stringify(va)===JSON.stringify(vb);
+    if(!same) diffCount++;
+    return `<tr class="${same?"":"diff"}">
+      <td class="dot ${same?"same":"diff"}">${same?"":"≠"}</td>
+      <td class="k">${esc(k)}</td>
+      <td class="v">${fmt(va)}</td>
+      <td class="v">${fmt(vb)}</td>
+    </tr>`;
+  }).join("");
+  $("metaWrap").innerHTML=`
+    <table class="meta-table">
+      <thead><tr><th></th><th>Field</th><th>File A</th><th>File B</th></tr></thead>
+      <tbody>${rows}</tbody>
+    </table>
+    <p class="muted" style="margin:8px 2px 0">${diffCount} of ${keys.length} field${keys.length===1?"":"s"} differ.</p>`;
+}
+
+/* ── contact / document comparison ── */
+const DOC_FIELDS=[
+  {k:"name",label:"Name"},
+  {k:"sharedWithType",label:"Shared with"},
+  {k:"sharedAt",label:"Shared at"},
+  {k:"effectiveDate",label:"Effective date"},
+  {k:"documentTypeId",label:"Doc type"},
+  {k:"funds",label:"Related funds", get:d=>fundsStr(d.relatedFunds)},
+];
+function docVal(d,f){ return f.get?f.get(d):d[f.k]; }
+function docDiff(da,db){  // returns array of changed-field descriptors
+  const changes=[];
+  for(const f of DOC_FIELDS){
+    const va=docVal(da,f), vb=docVal(db,f);
+    if((va??"")!==(vb??"")) changes.push({label:f.label, from:va, to:vb, key:f.k});
+  }
+  return changes;
+}
+
+// Build email-keyed index for one report. Falls back to id when email is blank.
+function indexByEmail(report){
+  const map=new Map();
+  for(const r of report.contactDocuments){
+    const c=r.contact||{};
+    const key=(c.email||"").trim().toLowerCase() || ("id:"+(c.id||""));
+    // If duplicate keys exist, merge their documents.
+    if(map.has(key)){
+      const ex=map.get(key); ex.documents=ex.documents.concat(r.documents||[]);
+    } else {
+      map.set(key, {contact:c, documents:(r.documents||[]).slice()});
+    }
+  }
+  return map;
+}
+
+let comparison=null;          // {rows:[...]}
+let filteredRows=[], shown=0;
+const PAGE=80;
+
+function compare(){
+  if(!(files.A&&files.B)){ setStatus("Load both files first.", true); return; }
+  setStatus("Comparing…");
+  renderMeta(files.A, files.B);
+
+  const ia=indexByEmail(files.A), ib=indexByEmail(files.B);
+  const keys=[...new Set([...ia.keys(),...ib.keys()])];
+  const rows=[];
+  for(const key of keys){
+    const a=ia.get(key), b=ib.get(key);
+    const contact=(b&&b.contact)||(a&&a.contact)||{};
+    let kind, docDelta={added:[],removed:[],changed:[],same:[]};
+    if(a&&!b) kind="only-a";
+    else if(b&&!a) kind="only-b";
+    else {
+      // both present — diff documents by id
+      const da=new Map((a.documents||[]).map(d=>[d.id,d]));
+      const db=new Map((b.documents||[]).map(d=>[d.id,d]));
+      for(const [id,d] of da){
+        if(!db.has(id)) docDelta.removed.push(d);
+        else { const ch=docDiff(d,db.get(id)); if(ch.length) docDelta.changed.push({a:d,b:db.get(id),changes:ch}); else docDelta.same.push(d); }
+      }
+      for(const [id,d] of db){ if(!da.has(id)) docDelta.added.push(d); }
+      const anyDocDiff=docDelta.added.length||docDelta.removed.length||docDelta.changed.length;
+      kind=anyDocDiff?"changed":"same";
+    }
+    rows.push({key, contact, kind, a, b, docDelta});
+  }
+  // Order: only-b, only-a, changed, same — then by email
+  const order={"only-b":0,"only-a":1,"changed":2,"same":3};
+  rows.sort((x,y)=> (order[x.kind]-order[y.kind]) || x.key.localeCompare(y.key));
+  comparison={rows};
+
+  // summary chips
+  const n=k=>rows.filter(r=>r.kind===k).length;
+  const docAgg=rows.reduce((s,r)=>{ s.added+=r.docDelta.added.length; s.removed+=r.docDelta.removed.length; s.changed+=r.docDelta.changed.length; return s; },{added:0,removed:0,changed:0});
+  $("contactSummary").innerHTML=[
+    {n:rows.length,label:"Contacts (union)",cls:""},
+    {n:n("only-b"),label:"Only in B",cls:"add"},
+    {n:n("only-a"),label:"Only in A",cls:"rem"},
+    {n:n("changed"),label:"Changed",cls:"chg"},
+    {n:n("same"),label:"Identical",cls:""},
+    {n:docAgg.added,label:"Docs added",cls:"add"},
+    {n:docAgg.removed,label:"Docs removed",cls:"rem"},
+    {n:docAgg.changed,label:"Docs changed",cls:"chg"},
+  ].map(c=>`<div class="chip ${c.cls}"><b>${c.n}</b><span>${esc(c.label)}</span></div>`).join("");
+
+  $("results").hidden=false;
+  applyFilter();
+  setStatus(`Compared ${rows.length} unique contact(s).`);
+}
+
+function applyFilter(){
+  if(!comparison) return;
+  const search=$("search").value.trim().toLowerCase();
+  const kind=$("filterKind").value;
+  let rows=comparison.rows;
+  if(kind==="changed") rows=rows.filter(r=>r.kind!=="same");
+  else if(kind==="diff-docs") rows=rows.filter(r=>r.kind==="changed");
+  else if(kind!=="all") rows=rows.filter(r=>r.kind===kind);
+  if(search) rows=rows.filter(r=>{
+    const c=r.contact;
+    if(r.key.includes(search)) return true;
+    if(`${c.firstName||""} ${c.lastName||""}`.toLowerCase().includes(search)) return true;
+    const docs=[...(r.a?r.a.documents:[]),...(r.b?r.b.documents:[])];
+    return docs.some(d=>(d.name||"").toLowerCase().includes(search)||(d.id||"").toLowerCase().includes(search));
+  });
+  filteredRows=rows; shown=0; $("cards").innerHTML="";
+  renderMore();
+}
+
+function kindTag(kind){
+  const m={"only-a":["only-a","Only in A"],"only-b":["only-b","Only in B"],"changed":["changed","Changed"],"same":["same","Identical"]}[kind];
+  return `<span class="tag ${m[0]}">${m[1]}</span>`;
+}
+function cardShell(r, idx){
+  const c=r.contact;
+  const name=esc(`${c.firstName||""} ${c.lastName||""}`.trim()||c.id||"(unknown)");
+  const email=esc(c.email||r.key.replace(/^id:/,"(no email · id ")+(r.key.startsWith("id:")?")":""));
+  const d=r.docDelta;
+  const pills=[];
+  if(d.added.length) pills.push(`<span class="pill add">+${d.added.length}</span>`);
+  if(d.removed.length) pills.push(`<span class="pill rem">−${d.removed.length}</span>`);
+  if(d.changed.length) pills.push(`<span class="pill chg">~${d.changed.length}</span>`);
+  if(r.kind==="only-a") pills.push(`<span class="pill rem">${(r.a.documents||[]).length} docs</span>`);
+  if(r.kind==="only-b") pills.push(`<span class="pill add">${(r.b.documents||[]).length} docs</span>`);
+  if(r.kind==="same") pills.push(`<span class="pill same">${(r.a.documents||[]).length} docs</span>`);
+  return `
+    <div class="card ${r.kind}" data-idx="${idx}">
+      <div class="card-head" onclick="toggleCard(this)">
+        <div class="card-avatar">${esc(initials(c.firstName,c.lastName))}</div>
+        <div>
+          <div class="card-name">${name}</div>
+          <div class="card-email">${email}</div>
+        </div>
+        <div class="card-meta">${kindTag(r.kind)}${pills.join("")}<span class="chevron">▾</span></div>
+      </div>
+      <div class="card-body"></div>
+    </div>`;
+}
+
+function valCell(v){ return v==null||v===""?'<span style="color:var(--absent)">—</span>':esc(typeof v==="object"?JSON.stringify(v):v); }
+function docName(d){ return esc(d.name||"—"); }
+function deltaList(changes){
+  return `<div class="delta">`+changes.map(ch=>
+    `<div><span class="fld">${esc(ch.label)}:</span> <span class="from">${valCell(ch.from)}</span> → <span class="to">${valCell(ch.to)}</span></div>`
+  ).join("")+`</div>`;
+}
+function docRows(r){
+  const d=r.docDelta;
+  const rows=[];
+  // For only-a / only-b, list all docs as removed/added.
+  if(r.kind==="only-a"){ (r.a.documents||[]).forEach(x=>rows.push({st:"rem",doc:x})); }
+  else if(r.kind==="only-b"){ (r.b.documents||[]).forEach(x=>rows.push({st:"add",doc:x})); }
+  else {
+    d.added.forEach(x=>rows.push({st:"add",doc:x}));
+    d.removed.forEach(x=>rows.push({st:"rem",doc:x}));
+    d.changed.forEach(x=>rows.push({st:"chg",doc:x.b,changes:x.changes}));
+    d.same.forEach(x=>rows.push({st:"same",doc:x}));
+  }
+  if(!rows.length) return `<div class="no-files">No documents in either report for this contact.</div>`;
+  const stLabel={add:"Added",rem:"Removed",chg:"Changed",same:"Unchanged"};
+  return `<table class="file-table"><thead><tr>
+      <th style="width:90px">Status</th><th>Document</th><th>Details</th><th style="width:30%">File ID</th>
+    </tr></thead><tbody>${rows.map(x=>`
+      <tr>
+        <td><span class="st ${x.st}">${stLabel[x.st]}</span></td>
+        <td class="file-name">${docName(x.doc)}</td>
+        <td>${x.changes?deltaList(x.changes):`<span class="muted">${esc(x.doc.sharedWithType||"")}</span>`}</td>
+        <td class="file-id">${esc(x.doc.id||"—")}</td>
+      </tr>`).join("")}</tbody></table>`;
+}
+
+function toggleCard(head){
+  const card=head.parentElement, body=card.querySelector(".card-body"), chev=card.querySelector(".chevron");
+  const open=body.classList.toggle("open"); chev.classList.toggle("open", open);
+  if(open && !body.dataset.built){
+    const idx=parseInt(card.getAttribute("data-idx"),10);
+    body.innerHTML=docRows(filteredRows[idx]);
+    body.dataset.built="1";
+  }
+}
+function renderMore(){
+  const slice=filteredRows.slice(shown, shown+PAGE);
+  const frag=document.createElement("div");
+  frag.innerHTML=slice.map((r,k)=>cardShell(r, shown+k)).join("") ||
+    (shown===0?`<div style="color:var(--ink-soft);padding:16px 0">No contacts match the current filter.</div>`:"");
+  while(frag.firstChild) $("cards").appendChild(frag.firstChild);
+  shown+=slice.length;
+  $("loadMore").style.display=shown<filteredRows.length?"block":"none";
+  $("loadMore").textContent=`Show more (${filteredRows.length-shown} remaining)`;
+}
+
+$("run").onclick=compare;
+$("search").oninput=()=>{ if(comparison) applyFilter(); };
+$("filterKind").onchange=()=>{ if(comparison) applyFilter(); };
+$("loadMore").onclick=renderMore;
+</script>
+</body>
+</html>
