@@ -156,7 +156,7 @@
       <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-weight:500;margin-top:12px">
         <input type="checkbox" id="useInvViaIEFLE" style="width:auto"> Resolve Investments via IE × FLE matrix
       </label>
-      <p class="muted" style="margin:6px 0 0">Maps each investment to its IE and fund legal entity (investments export), then resolves through the <b>IE × FLE × communication-type</b> matrix. Takes priority over the investment matrix.</p>
+      <p class="muted" style="margin:6px 0 0">Affects <b>only how Investments-shared documents are matched to contacts</b>: each investment is mapped to its IE and fund legal entity (investments export), then resolved through the <b>IE × FLE × communication-type</b> matrix. It does not change the Investments matrix-record count below. Takes priority over the investment matrix when both are checked.</p>
     </div>
 
     <div class="row">
@@ -342,12 +342,9 @@ function renderReport(report){
     chips.push(mx.ieFleTargetsPresent
       ? {n:mx.communicationMatrixRows??0,label:"IE×FLE×Type",tip:"Rows in the communication-matrices export (one contact × IE × FLE, with its yes/no communication-type map)."}
       : {n:"—",label:"IE×FLE×Type",tip:"Not fetched — no documents use the InvestmentEntitiesInFundLegalEntity target."});
-    if(mx.investmentsViaIEFLE && mx.investmentTargetsPresent)
-      chips.push({n:mx.investmentRecords??0,label:"Investments",tip:"Rows in the investments export, used to map each investment to its IE and fund legal entity."});
-    else if(mx.investmentTargetsPresent && mx.investmentMatrixUsed)
-      chips.push({n:mx.investmentMatrixRows??0,label:"Inv×Type",tip:"Rows in the investment-communication-matrices export (one contact × investment, with its yes/no communication-type map)."});
-    else
-      chips.push({n:"—",label:"Inv×Type",tip:"Not fetched — no investment matrix was used (and/or no Investments-shared documents)."});
+    chips.push(mx.investmentMatrixUsed
+      ? {n:mx.investmentMatrixRows??0,label:"Investments",tip:"Rows in the investment-communication-matrices export (one contact × investment, with its yes/no communication-type map)."}
+      : {n:"—",label:"Investments",tip:"Not fetched — enable ‘Use Investment matrix’ to run the investment-communication-matrices export."});
     $("summaryMatrices").innerHTML = `<span class="group-label">Matrix records</span>`+chips.map(c=>`<div class="chip-sm" data-tip="${esc(c.tip)}"><b>${c.n}</b><span>${esc(c.label)}</span></div>`).join("");
     $("summaryMatrices").style.display="flex";
   } else $("summaryMatrices").style.display="none";
