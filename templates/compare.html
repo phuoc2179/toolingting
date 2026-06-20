@@ -15,6 +15,7 @@
     --radius:10px;
   }
   *, *::before, *::after { box-sizing: border-box }
+  [hidden] { display:none !important }
   body { margin:0; background:var(--bg); color:var(--ink); font-family:var(--sans); font-size:14px; line-height:1.5 }
   .wrap { max-width:1200px; margin:0 auto; padding:28px 22px 80px }
   header h1 { font-size:20px; margin:0 0 2px; letter-spacing:-.01em }
@@ -52,6 +53,7 @@
   .chip b { display:block; font-size:22px; line-height:1.1 }
   .chip span { font-size:11px; color:var(--ink-soft) }
   .chip.add b { color:var(--add) } .chip.rem b { color:var(--rem) } .chip.chg b { color:var(--chg) }
+  .chip[title] { cursor:help }
 
   /* meta diff table */
   .meta-table { width:100%; border-collapse:collapse; font-size:13px; background:#fff; border:1px solid var(--line); border-radius:var(--radius); overflow:hidden }
@@ -68,6 +70,26 @@
   .toolbar { display:flex; gap:12px; align-items:center; margin:0 0 10px; flex-wrap:wrap }
   .toolbar input[type=text] { width:240px; font-size:12px; padding:7px 10px; border:1px solid var(--line); border-radius:7px; font-family:var(--mono) }
   .toolbar select { width:auto; font-family:var(--sans); font-size:12px; padding:7px 10px; border:1px solid var(--line); border-radius:7px; background:#fff }
+
+  /* simple-mode toggle */
+  .switch { display:inline-flex; align-items:center; gap:8px; cursor:pointer; user-select:none; margin-left:auto }
+  .switch input { position:absolute; opacity:0; width:0; height:0 }
+  .switch .track { width:38px; height:22px; border-radius:20px; background:var(--line); position:relative; transition:background .15s; flex-shrink:0 }
+  .switch .thumb { position:absolute; top:2px; left:2px; width:18px; height:18px; border-radius:50%; background:#fff; box-shadow:0 1px 2px rgba(0,0,0,.25); transition:transform .15s }
+  .switch input:checked + .track { background:var(--accent) }
+  .switch input:checked + .track .thumb { transform:translateX(16px) }
+  .switch .switch-label { font-size:12px; font-weight:600; color:var(--ink) }
+
+  /* simple-mode list */
+  .simple-count { margin:2px 0 12px; font-size:13px; color:var(--ink-soft) }
+  .simple-count b { color:var(--ink) }
+  .simple-list { display:flex; flex-direction:column; border:1px solid var(--line); border-radius:var(--radius); overflow:hidden; background:#fff }
+  .simple-row { display:flex; align-items:center; gap:12px; padding:10px 16px; border-bottom:1px solid var(--line) }
+  .simple-row:last-child { border-bottom:0 }
+  .simple-row .s-name { font-weight:600; font-size:13px }
+  .simple-row .s-email { font-size:12px; color:var(--ink-soft) }
+  .simple-row .s-meta { margin-left:auto; display:flex; align-items:center; gap:6px; flex-wrap:wrap; justify-content:flex-end }
+  .simple-empty { padding:18px 16px; color:var(--ink-soft); font-size:13px; font-style:italic }
 
   .cards { display:flex; flex-direction:column; gap:10px }
   .card { background:#fff; border:1px solid var(--line); border-radius:var(--radius); overflow:hidden }
@@ -152,11 +174,14 @@
   </div>
 
   <div id="results" hidden>
-    <div class="section-title">Metadata</div>
-    <div id="metaWrap"></div>
+    <div id="metaSection">
+      <div class="section-title">Metadata</div>
+      <div id="metaWrap"></div>
+    </div>
 
     <div class="section-title">Documents shared by contact <span style="font-weight:400;text-transform:none;letter-spacing:0">(matched by email)</span></div>
     <div class="summary" id="contactSummary"></div>
+    <div class="simple-count" id="simpleCount" hidden></div>
 
     <div class="toolbar">
       <input type="text" id="search" placeholder="Search by email, name, or document…">
@@ -168,8 +193,14 @@
         <option value="diff-docs">Document changes only</option>
         <option value="same">Identical contacts</option>
       </select>
+      <label class="switch" title="Compare file existence per contact">
+        <input type="checkbox" id="simpleToggle">
+        <span class="track"><span class="thumb"></span></span>
+        <span class="switch-label">Simple mode</span>
+      </label>
     </div>
     <div class="cards" id="cards"></div>
+    <div class="simple-list" id="simpleList" hidden></div>
     <button class="btn-ghost load-more" id="loadMore" style="display:none">Show more</button>
   </div>
 </div>
@@ -306,6 +337,7 @@ function indexByEmail(report){
 
 let comparison=null;          // {rows:[...]}
 let filteredRows=[], shown=0;
+let simpleMode=false;
 const PAGE=80;
 
 function compare(){
@@ -345,15 +377,15 @@ function compare(){
   const n=k=>rows.filter(r=>r.kind===k).length;
   const docAgg=rows.reduce((s,r)=>{ s.added+=r.docDelta.added.length; s.removed+=r.docDelta.removed.length; s.changed+=r.docDelta.changed.length; return s; },{added:0,removed:0,changed:0});
   $("contactSummary").innerHTML=[
-    {n:rows.length,label:"Contacts (union)",cls:""},
-    {n:n("only-b"),label:"Only in B",cls:"add"},
-    {n:n("only-a"),label:"Only in A",cls:"rem"},
-    {n:n("changed"),label:"Changed",cls:"chg"},
-    {n:n("same"),label:"Identical",cls:""},
-    {n:docAgg.added,label:"Docs added",cls:"add"},
-    {n:docAgg.removed,label:"Docs removed",cls:"rem"},
-    {n:docAgg.changed,label:"Docs changed",cls:"chg"},
-  ].map(c=>`<div class="chip ${c.cls}"><b>${c.n}</b><span>${esc(c.label)}</span></div>`).join("");
+    {n:rows.length,label:"Contacts (union)",cls:"",tip:"All distinct contacts found in either file, matched by email (or contact ID when email is blank)."},
+    {n:n("only-b"),label:"Only in B",cls:"add",tip:"Contacts present in File B but not in File A (added in the newer report)."},
+    {n:n("only-a"),label:"Only in A",cls:"rem",tip:"Contacts present in File A but not in File B (removed in the newer report)."},
+    {n:n("changed"),label:"Changed",cls:"chg",tip:"Contacts in both files whose shared documents differ — any document added, removed, or with a changed field."},
+    {n:n("same"),label:"Identical",cls:"",tip:"Contacts in both files with exactly the same shared documents and no field changes."},
+    {n:docAgg.added,label:"Docs added",cls:"add",tip:"Documents shared in File B but not File A, summed across every contact present in both files."},
+    {n:docAgg.removed,label:"Docs removed",cls:"rem",tip:"Documents shared in File A but not File B, summed across every contact present in both files."},
+    {n:docAgg.changed,label:"Docs changed",cls:"chg",tip:"Documents present in both files for a contact but with a changed field (shared-with type, shared/effective date, doc type, or related funds), summed across all contacts."},
+  ].map(c=>`<div class="chip ${c.cls}" title="${esc(c.tip)}"><b>${c.n}</b><span>${esc(c.label)}</span></div>`).join("");
 
   $("results").hidden=false;
   applyFilter();
@@ -365,7 +397,11 @@ function applyFilter(){
   const search=$("search").value.trim().toLowerCase();
   const kind=$("filterKind").value;
   let rows=comparison.rows;
-  if(kind==="changed") rows=rows.filter(r=>r.kind!=="same");
+  // Simple mode compares file existence per contact only: a contact is a mismatch
+  // when it exists in just one file, or has a document added/removed. Field-only
+  // changes (e.g. shared-with type) are NOT counted.
+  if(simpleMode) rows=rows.filter(r=>r.kind==="only-a"||r.kind==="only-b"||r.docDelta.added.length||r.docDelta.removed.length);
+  else if(kind==="changed") rows=rows.filter(r=>r.kind!=="same");
   else if(kind==="diff-docs") rows=rows.filter(r=>r.kind==="changed");
   else if(kind!=="all") rows=rows.filter(r=>r.kind===kind);
   if(search) rows=rows.filter(r=>{
@@ -375,7 +411,8 @@ function applyFilter(){
     const docs=[...(r.a?r.a.documents:[]),...(r.b?r.b.documents:[])];
     return docs.some(d=>(d.name||"").toLowerCase().includes(search)||(d.id||"").toLowerCase().includes(search));
   });
-  filteredRows=rows; shown=0; $("cards").innerHTML="";
+  filteredRows=rows; shown=0; $("cards").innerHTML=""; $("simpleList").innerHTML="";
+  if(simpleMode) $("simpleCount").innerHTML=`<b>${rows.length}</b> contact${rows.length===1?"":"s"} with mismatched documents${search?" (filtered)":""}.`;
   renderMore();
 }
 
@@ -450,20 +487,57 @@ function toggleCard(head){
     body.dataset.built="1";
   }
 }
+function simpleMeta(r){
+  // File-existence view: only added/removed documents count — never field changes.
+  const d=r.docDelta, pills=[];
+  if(r.kind==="only-a") return `<span class="tag only-a">Only in A</span><span class="pill rem">${(r.a.documents||[]).length} docs</span>`;
+  if(r.kind==="only-b") return `<span class="tag only-b">Only in B</span><span class="pill add">${(r.b.documents||[]).length} docs</span>`;
+  if(d.added.length) pills.push(`<span class="pill add">+${d.added.length}</span>`);
+  if(d.removed.length) pills.push(`<span class="pill rem">−${d.removed.length}</span>`);
+  return pills.join("");
+}
+function simpleRow(r){
+  const c=r.contact;
+  const name=esc(`${c.firstName||""} ${c.lastName||""}`.trim()||c.id||"(unknown)");
+  const email=esc(c.email||r.key.replace(/^id:/,"(no email · id ")+(r.key.startsWith("id:")?")":""));
+  return `<div class="simple-row">
+      <div><div class="s-name">${name}</div><div class="s-email">${email}</div></div>
+      <div class="s-meta">${simpleMeta(r)}</div>
+    </div>`;
+}
 function renderMore(){
   const slice=filteredRows.slice(shown, shown+PAGE);
-  const frag=document.createElement("div");
-  frag.innerHTML=slice.map((r,k)=>cardShell(r, shown+k)).join("") ||
-    (shown===0?`<div style="color:var(--ink-soft);padding:16px 0">No contacts match the current filter.</div>`:"");
-  while(frag.firstChild) $("cards").appendChild(frag.firstChild);
+  if(simpleMode){
+    const frag=document.createElement("div");
+    frag.innerHTML=slice.map(simpleRow).join("") ||
+      (shown===0?`<div class="simple-empty">No contacts have mismatched documents${$("search").value.trim()?" for this search":""}.</div>`:"");
+    while(frag.firstChild) $("simpleList").appendChild(frag.firstChild);
+  } else {
+    const frag=document.createElement("div");
+    frag.innerHTML=slice.map((r,k)=>cardShell(r, shown+k)).join("") ||
+      (shown===0?`<div style="color:var(--ink-soft);padding:16px 0">No contacts match the current filter.</div>`:"");
+    while(frag.firstChild) $("cards").appendChild(frag.firstChild);
+  }
   shown+=slice.length;
   $("loadMore").style.display=shown<filteredRows.length?"block":"none";
   $("loadMore").textContent=`Show more (${filteredRows.length-shown} remaining)`;
 }
 
+function setSimpleMode(on){
+  simpleMode=on;
+  $("metaSection").hidden=on;
+  $("contactSummary").hidden=on;
+  $("simpleCount").hidden=!on;
+  $("filterKind").style.display=on?"none":"";
+  $("cards").hidden=on;
+  $("simpleList").hidden=!on;
+  if(comparison) applyFilter();
+}
+
 $("run").onclick=compare;
 $("search").oninput=()=>{ if(comparison) applyFilter(); };
 $("filterKind").onchange=()=>{ if(comparison) applyFilter(); };
+$("simpleToggle").onchange=e=>setSimpleMode(e.target.checked);
 $("loadMore").onclick=renderMore;
 </script>
 </body>
