@@ -120,7 +120,11 @@
   <header>
     <h1>Contact → Portal Documents Report</h1>
     <p>Fetches all contacts for a firm, then maps each contact to the portal documents they can access. Runs in a local Python backend, so large firms won't crash the browser.</p>
-    <p style="margin:0 0 20px"><a href="/compare" style="color:var(--accent);text-decoration:none;font-weight:600">Compare two downloaded reports →</a></p>
+    <p style="margin:0 0 20px">
+      <a href="/compare" target="_blank" rel="noopener" style="color:var(--accent);text-decoration:none;font-weight:600">Compare Contacts-Documents reports →</a>
+      <span style="color:var(--line);margin:0 10px">|</span>
+      <a href="/documents" target="_blank" rel="noopener" style="color:var(--accent);text-decoration:none;font-weight:600">View documents report →</a>
+    </p>
   </header>
 
   <div class="panel">
@@ -162,9 +166,17 @@
 
     <div class="row">
       <button class="btn-go" id="run">Generate report</button>
-      <button class="btn-ghost" id="btnDownloadJson" disabled>Download JSON</button>
+      <button class="btn-ghost" id="btnDownloadJson" disabled>Download Contact-Document report</button>
       <button class="btn-ghost" id="btnDownloadCsv" disabled>Download CSV</button>
       <span class="muted">Credentials are sent only to your local backend, which calls the server above.</span>
+    </div>
+
+    <div class="row" style="margin-top:10px">
+      <label class="btn-ghost" style="cursor:pointer;display:inline-flex;align-items:center;margin:0;font-weight:500">
+        Upload Contact-Document report…
+        <input type="file" id="uploadJson" accept="application/json,.json" hidden>
+      </label>
+      <span class="muted">Load a previously downloaded Contact-Document report JSON to view it here.</span>
     </div>
 
     <div class="status" id="status"></div>
@@ -177,6 +189,14 @@
     <div class="summary summary-targets" id="summaryTargets"></div>
     <div class="summary summary-targets" id="summaryMatrices"></div>
 
+    <div class="section-title">Documents report</div>
+    <div class="row" style="margin-top:0">
+      <button class="btn-ghost" id="btnDownloadDocs" disabled>Download documents report</button>
+      <button class="btn-ghost" id="btnViewDocs">View documents report ↗</button>
+      <span class="muted">The raw list-portal-documents API response. “View” opens a filterable viewer in a new tab.</span>
+    </div>
+
+    <div class="section-title">Contacts</div>
     <div class="toolbar">
       <input type="text" id="search" placeholder="Search contacts or files…">
       <select id="filterDocs">
@@ -245,6 +265,7 @@ const MODE_HINTS = {
 function updateModeHint(){ const m=$("mode").value; $("modeHint").textContent=MODE_HINTS[m]; $("invMatrixWrap").style.display=m==="bulk"?"block":"none"; }
 
 let reportData = null;
+let rawDocuments = null;   // raw list-portal-documents API response (bulk generation only)
 let filteredRows = [];
 const PAGE = 100;     // render contacts in pages to keep the DOM light
 let shown = 0;
@@ -261,8 +282,8 @@ async function run(){
   };
   if(!payload.server || !payload.firmId || !payload.apiKey){ setStatus("Server, Firm ID, and API key are all required.", true); return; }
 
-  $("run").disabled = true; $("btnDownloadJson").disabled = true; $("btnDownloadCsv").disabled = true;
-  $("results").hidden = true; reportData = null;
+  $("run").disabled = true; $("btnDownloadJson").disabled = true; $("btnDownloadCsv").disabled = true; $("btnDownloadDocs").disabled = true;
+  $("results").hidden = true; reportData = null; rawDocuments = null;
   setStatus("Starting…"); showProgress(true);
 
   let jobId;
@@ -283,12 +304,14 @@ async function run(){
     if(data.status === "error"){ showProgress(false); setStatus("Error: "+(data.error||"unknown"), true); $("run").disabled=false; return; }
     if(data.status === "done"){
       reportData = data.report;
+      rawDocuments = data.rawDocuments || null;
       fetch("/api/done/"+jobId, {method:"POST"}).catch(()=>{});
       showProgress(false);
       const m = reportData.meta;
       setStatus(`Done — ${m.apiRequestCount} API call${m.apiRequestCount===1?"":"s"}.`);
       renderReport(reportData);
       $("run").disabled=false; $("btnDownloadJson").disabled=false; $("btnDownloadCsv").disabled=false;
+      $("btnDownloadDocs").disabled = !(rawDocuments && rawDocuments.length);
     }
   };
   poll();
@@ -452,6 +475,65 @@ function downloadJson(){
   triggerDownload(blob, `${reportFileBase()}.json`);
 }
 
+function downloadDocs(){
+  if(!rawDocuments || !rawDocuments.length) return;
+  const firmId = reportData?.meta?.firmId || "firm";
+  const blob=new Blob([JSON.stringify(rawDocuments,null,2)],{type:"application/json"});
+  triggerDownload(blob, `portal-documents-${firmId}-${new Date().toISOString().slice(0,10)}.json`);
+}
+
+// Open the documents-report viewer in a new tab. Hand the current raw docs over
+// via localStorage when they're under the auto-load thresholds; otherwise leave a
+// note so the viewer can warn the user to download + upload manually.
+// Thresholds: localStorage tops out around ~5 MB per origin, so we cap the hand-off
+// well under that (4 MB), with a friendly document-count ceiling (5,000) on top.
+const DOCS_HANDOFF_KEY = "documentsReportHandoff";
+const DOCS_HANDOFF_NOTE_KEY = "documentsReportHandoffNote";
+const MAX_HANDOFF_DOCS = 5000;
+const MAX_HANDOFF_BYTES = 4 * 1024 * 1024;  // 4 MB
+function viewDocs(){
+  try {
+    localStorage.removeItem(DOCS_HANDOFF_KEY);
+    localStorage.removeItem(DOCS_HANDOFF_NOTE_KEY);
+    if(rawDocuments && rawDocuments.length){
+      const count = rawDocuments.length;
+      const payload = JSON.stringify(rawDocuments);
+      const bytes = payload.length;
+      const note = { count, mb:+(bytes/1048576).toFixed(1), maxDocs:MAX_HANDOFF_DOCS, maxMb:MAX_HANDOFF_BYTES/1048576 };
+      let tooBig = count > MAX_HANDOFF_DOCS || bytes > MAX_HANDOFF_BYTES;
+      if(!tooBig){
+        try { localStorage.setItem(DOCS_HANDOFF_KEY, payload); }
+        catch { tooBig = true; }  // quota exceeded despite the size check
+      }
+      if(tooBig) localStorage.setItem(DOCS_HANDOFF_NOTE_KEY, JSON.stringify(note));
+    }
+  } catch {}
+  window.open("/documents", "_blank", "noopener");
+}
+
+// Load a previously downloaded Contact-Document report JSON and render it.
+function loadReportFromFile(file){
+  const reader = new FileReader();
+  reader.onload = () => {
+    let data;
+    try { data = JSON.parse(reader.result); }
+    catch { setStatus(`Could not load ${file.name}: not valid JSON.`, true); return; }
+    if(!data || !data.meta || !Array.isArray(data.contactDocuments)){
+      setStatus(`Could not load ${file.name}: not a Contact-Document report JSON.`, true);
+      return;
+    }
+    reportData = data;
+    rawDocuments = Array.isArray(data.rawPortalDocuments) ? data.rawPortalDocuments : null;
+    showProgress(false);
+    setStatus(`Loaded ${file.name} — ${data.meta.totalContacts} contact${data.meta.totalContacts===1?"":"s"}.`);
+    renderReport(reportData);
+    $("btnDownloadJson").disabled=false; $("btnDownloadCsv").disabled=false;
+    $("btnDownloadDocs").disabled = !(rawDocuments && rawDocuments.length);
+  };
+  reader.onerror = () => setStatus(`Could not read ${file.name}.`, true);
+  reader.readAsText(file);
+}
+
 function csvCell(v){
   const s = v==null ? "" : String(v);
   return /[",\n\r]/.test(s) ? '"'+s.replace(/"/g,'""')+'"' : s;
@@ -486,7 +568,10 @@ function downloadCsv(){
 
 $("run").onclick=run;
 $("btnDownloadJson").onclick=downloadJson;
+$("btnDownloadDocs").onclick=downloadDocs;
+$("btnViewDocs").onclick=viewDocs;
 $("btnDownloadCsv").onclick=downloadCsv;
+$("uploadJson").onchange=e=>{ const f=e.target.files[0]; if(f) loadReportFromFile(f); e.target.value=""; };
 $("btnCopyJson").onclick=async()=>{ if(!reportData) return; const ok=await copyText(JSON.stringify(reportData,null,2)); const b=$("btnCopyJson"); const o=b.textContent; b.textContent=ok?"Copied!":"Copy failed"; setTimeout(()=>b.textContent=o,1200); };
 $("search").oninput=()=>{ if(reportData) applyFilter(); };
 $("filterDocs").onchange=()=>{ if(reportData) applyFilter(); };
