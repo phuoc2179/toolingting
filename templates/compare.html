@@ -84,11 +84,16 @@
   .simple-count { margin:2px 0 12px; font-size:13px; color:var(--ink-soft) }
   .simple-count b { color:var(--ink) }
   .simple-list { display:flex; flex-direction:column; border:1px solid var(--line); border-radius:var(--radius); overflow:hidden; background:#fff }
-  .simple-row { display:flex; align-items:center; gap:12px; padding:10px 16px; border-bottom:1px solid var(--line) }
-  .simple-row:last-child { border-bottom:0 }
+  .simple-item { border-bottom:1px solid var(--line) }
+  .simple-item:last-child { border-bottom:0 }
+  .simple-row { display:flex; align-items:center; gap:12px; padding:10px 16px; cursor:pointer; user-select:none }
+  .simple-row:hover { background:#f7f9fb }
   .simple-row .s-name { font-weight:600; font-size:13px }
   .simple-row .s-email { font-size:12px; color:var(--ink-soft) }
   .simple-row .s-meta { margin-left:auto; display:flex; align-items:center; gap:6px; flex-wrap:wrap; justify-content:flex-end }
+  .simple-row .chevron { margin-left:0 }
+  .simple-body { display:none; border-top:1px solid var(--line); background:#fafbfc }
+  .simple-body.open { display:block }
   .simple-empty { padding:18px 16px; color:var(--ink-soft); font-size:13px; font-style:italic }
 
   .cards { display:flex; flex-direction:column; gap:10px }
@@ -496,20 +501,50 @@ function simpleMeta(r){
   if(d.removed.length) pills.push(`<span class="pill rem">−${d.removed.length}</span>`);
   return pills.join("");
 }
-function simpleRow(r){
+function simpleDocRows(r){
+  // File-existence detail: only added/removed documents (or all docs for one-sided contacts).
+  const rows=[];
+  if(r.kind==="only-a"){ (r.a.documents||[]).forEach(x=>rows.push({st:"rem",doc:x})); }
+  else if(r.kind==="only-b"){ (r.b.documents||[]).forEach(x=>rows.push({st:"add",doc:x})); }
+  else { r.docDelta.added.forEach(x=>rows.push({st:"add",doc:x})); r.docDelta.removed.forEach(x=>rows.push({st:"rem",doc:x})); }
+  if(!rows.length) return `<div class="no-files">No file additions or removals for this contact.</div>`;
+  const stLabel={add:"Added",rem:"Removed"};
+  return `<table class="file-table"><thead><tr>
+      <th style="width:90px">Status</th><th>Document</th><th>Shared with</th><th style="width:30%">File ID</th>
+    </tr></thead><tbody>${rows.map(x=>`
+      <tr>
+        <td><span class="st ${x.st}">${stLabel[x.st]}</span></td>
+        <td class="file-name">${docName(x.doc)}</td>
+        <td><span class="muted">${esc(x.doc.sharedWithType||"")}</span></td>
+        <td class="file-id">${esc(x.doc.id||"—")}</td>
+      </tr>`).join("")}</tbody></table>`;
+}
+function simpleRow(r, idx){
   const c=r.contact;
   const name=esc(`${c.firstName||""} ${c.lastName||""}`.trim()||c.id||"(unknown)");
   const email=esc(c.email||r.key.replace(/^id:/,"(no email · id ")+(r.key.startsWith("id:")?")":""));
-  return `<div class="simple-row">
-      <div><div class="s-name">${name}</div><div class="s-email">${email}</div></div>
-      <div class="s-meta">${simpleMeta(r)}</div>
+  return `<div class="simple-item" data-idx="${idx}">
+      <div class="simple-row" onclick="toggleSimpleRow(this)">
+        <div><div class="s-name">${name}</div><div class="s-email">${email}</div></div>
+        <div class="s-meta">${simpleMeta(r)}<span class="chevron">▾</span></div>
+      </div>
+      <div class="simple-body"></div>
     </div>`;
+}
+function toggleSimpleRow(head){
+  const item=head.parentElement, body=item.querySelector(".simple-body"), chev=item.querySelector(".chevron");
+  const open=body.classList.toggle("open"); chev.classList.toggle("open", open);
+  if(open && !body.dataset.built){
+    const idx=parseInt(item.getAttribute("data-idx"),10);
+    body.innerHTML=simpleDocRows(filteredRows[idx]);
+    body.dataset.built="1";
+  }
 }
 function renderMore(){
   const slice=filteredRows.slice(shown, shown+PAGE);
   if(simpleMode){
     const frag=document.createElement("div");
-    frag.innerHTML=slice.map(simpleRow).join("") ||
+    frag.innerHTML=slice.map((r,k)=>simpleRow(r, shown+k)).join("") ||
       (shown===0?`<div class="simple-empty">No contacts have mismatched documents${$("search").value.trim()?" for this search":""}.</div>`:"");
     while(frag.firstChild) $("simpleList").appendChild(frag.firstChild);
   } else {

@@ -40,6 +40,12 @@ def compare():
     return render_template("compare.html")
 
 
+@app.route("/documents")
+def documents():
+    # Client-side viewer for a downloaded documents report (raw list-portal-documents response).
+    return render_template("documents.html")
+
+
 @app.route("/api/generate", methods=["POST"])
 def generate():
     data = request.get_json(force=True) or {}
@@ -59,7 +65,8 @@ def generate():
 
     job_id = uuid.uuid4().hex
     with LOCK:
-        JOBS[job_id] = {"status": "running", "progress": "Starting…", "report": None, "error": None}
+        JOBS[job_id] = {"status": "running", "progress": "Starting…", "report": None,
+                        "rawDocuments": None, "error": None}
 
     def run():
         def on_log(msg):
@@ -73,9 +80,15 @@ def generate():
                 use_investment_matrix=use_inv,
                 use_investments_via_iefle=use_iefle,
                 concurrency=concurrency,
+                include_raw_documents=True,
             )
+            # Keep the raw list-portal-documents response out of the report itself
+            # (so it isn't doubled into the Contact-Document download / JSON preview);
+            # the frontend downloads it separately.
+            raw_documents = report.pop("rawPortalDocuments", None)
             with LOCK:
-                JOBS[job_id].update(status="done", report=report, progress="Done.")
+                JOBS[job_id].update(status="done", report=report,
+                                    rawDocuments=raw_documents, progress="Done.")
         except Exception as e:  # noqa: BLE001 — surface any failure to the UI
             with LOCK:
                 JOBS[job_id].update(status="error", error=str(e))
@@ -93,6 +106,7 @@ def status(job_id):
         resp = {"status": job["status"], "progress": job["progress"], "error": job["error"]}
         if job["status"] == "done":
             resp["report"] = job["report"]
+            resp["rawDocuments"] = job["rawDocuments"]
     return jsonify(resp)
 
 

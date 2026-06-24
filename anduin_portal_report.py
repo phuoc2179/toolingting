@@ -599,7 +599,8 @@ def print_summary(report):
 # ──────────────────────────────────────────────────────────────────────────
 # Orchestration
 # ──────────────────────────────────────────────────────────────────────────
-def generate(client, *, mode, use_investment_matrix, use_investments_via_iefle, concurrency):
+def generate(client, *, mode, use_investment_matrix, use_investments_via_iefle, concurrency,
+             include_raw_documents=False):
     client.log("Step 1 — Loading contacts…")
     contacts = fetch_all_contacts(client)
     if not contacts:
@@ -616,6 +617,7 @@ def generate(client, *, mode, use_investment_matrix, use_investments_via_iefle, 
     matrix_info = {}
     total_documents_from_api = None
     target_type_counts = None
+    raw_portal_documents = None  # raw list-portal-documents API response, for optional download
 
     if mode == "bulk":
         client.log("Step 2 — Fetching all portal documents…")
@@ -657,6 +659,7 @@ def generate(client, *, mode, use_investment_matrix, use_investments_via_iefle, 
         )
         total_documents_from_api = len(all_docs)
         target_type_counts = count_target_types(all_docs)
+        raw_portal_documents = all_docs
 
     else:  # per-contact
         client.log(f"Step 2 — Querying documents per contact (concurrency={concurrency})…")
@@ -667,12 +670,16 @@ def generate(client, *, mode, use_investment_matrix, use_investments_via_iefle, 
             for d in lst:
                 uniq.setdefault(d["id"], d)
         target_type_counts = count_target_types(list(uniq.values()))
+        raw_portal_documents = list(uniq.values())
 
-    return build_report(
+    report = build_report(
         contacts, docs_per_contact, client, fle_names,
         query_mode=mode, unresolved=unresolved, matrix_info=matrix_info,
         total_documents_from_api=total_documents_from_api, target_type_counts=target_type_counts,
     )
+    if include_raw_documents:
+        report["rawPortalDocuments"] = raw_portal_documents or []
+    return report
 
 
 def main(argv=None):
